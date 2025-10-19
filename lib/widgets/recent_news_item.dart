@@ -24,8 +24,8 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
   bool _saved = false;
 
   // Tune these to make the image a bit larger
-  static const double _thumbW = 160; // wider image
-  static const double _thumbH = 100; // ~16:10 look with round corners
+  static const double _thumbW = 120; // wider image
+  static const double _thumbH = 120; // ~16:10 look with round corners
 
   @override
   void initState() {

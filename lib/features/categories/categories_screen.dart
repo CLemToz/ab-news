@@ -10,6 +10,7 @@ class CategoriesScreen extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         const SliverAppBar(title: Text('Category'), pinned: true),
+
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverGrid(
