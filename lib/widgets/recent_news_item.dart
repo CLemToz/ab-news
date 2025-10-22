@@ -32,6 +32,20 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
   static const double _thumbW = 120; // wider image
   static const double _thumbH = 120; // square-ish with round corners
 
+  String _dateOnly(String s) {
+    if (s.isEmpty) return s;
+
+    // If there's a time like "9:05 AM", cut everything from there
+    final m = RegExp(r'\d{1,2}:\d{2}\s*(AM|PM|am|pm)?').firstMatch(s);
+    if (m != null) {
+      s = s.substring(0, m.start).trim();
+    }
+
+    // Clean trailing separators (•, ·, |, -, ,)
+    s = s.replaceAll(RegExp(r'[•·\|\-,]\s*$'), '').trim();
+    return s;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,23 +62,66 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
   }
 
   Future<void> _shareOnWhatsApp() async {
-    final title = _get<String>(() => widget.article.title) ?? '';
-    final url = _get<String>(() => widget.article.url) ?? '';
-    final text = Uri.encodeComponent('$title ${url.isNotEmpty ? url : ''}');
-    final uri = Uri.parse('whatsapp://send?text=$text');
+    // Safe getter
+    String _s(String? Function() r) {
+      try {
+        final v = r();
+        return (v ?? '').trim();
+      } catch (_) {
+        return '';
+      }
+    }
+
+    // --- Extract post fields ---
+    final title = _s(() => widget.article.title);
+    final summary0 = _s(() => widget.article.summary).isNotEmpty
+        ? _s(() => widget.article.summary)
+        : (_s(() => widget.article.excerpt).isNotEmpty
+              ? _s(() => widget.article.excerpt)
+              : _s(() => widget.article.subtitle));
+    final postUrl = (() {
+      final u1 = _s(() => widget.article.url);
+      final u2 = _s(() => widget.article.link);
+      return u1.isNotEmpty ? u1 : u2;
+    })();
+
+    // --- Text cleanup ---
+    String _stripHtml(String s) => s
+        .replaceAll(RegExp(r'<[^>]+>'), ' ')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    String _truncate(String s, int max) =>
+        s.length <= max ? s : (s.substring(0, max).trimRight() + '…');
+
+    final desc = _truncate(_stripHtml(summary0), 160);
+
+    // --- ✨ Build WhatsApp message with emojis + bold title ---
+    final parts = <String>[
+      if (title.isNotEmpty) "📰 *$title*", // <-- bold title
+      if (desc.isNotEmpty) "🗞️ $desc",
+      if (postUrl.isNotEmpty) "👉 $postUrl", // clean single link
+      "\n📱 Read this story on DK News Plus App!",
+    ];
+
+    final message = parts.join('\n\n');
+    final encoded = Uri.encodeComponent(message);
+
+    final deepLink = Uri.parse('whatsapp://send?text=$encoded');
+    final webLink = Uri.parse('https://wa.me/?text=$encoded');
 
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
+      if (await canLaunchUrl(deepLink)) {
+        await launchUrl(deepLink);
       } else {
-        final web = Uri.parse('https://wa.me/?text=$text');
-        await launchUrl(web, mode: LaunchMode.externalApplication);
+        await launchUrl(webLink, mode: LaunchMode.externalApplication);
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to share on WhatsApp')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unable to open WhatsApp')));
     }
   }
 
@@ -92,6 +149,8 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
         _get<String>(() => a.published) ??
         _get<String>(() => a.dateString) ??
         '';
+    final displayDate = _dateOnly(dateText);
+
     final isVideo = _get<bool>(() => a.isVideo) ?? false;
     final duration = _get<String>(() => a.videoDuration) ?? '';
 
@@ -221,13 +280,13 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
                   TagChip(text: category),
 
                   // Full-width time (NO truncation)
-                  if (dateText.isNotEmpty)
+                  if (displayDate.isNotEmpty)
                     Padding(
-                      padding: EdgeInsets.only(left: 8.0),
+                      padding: const EdgeInsets.only(left: 8.0),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          dateText,
+                          displayDate, // <-- was dateText
                           softWrap: true,
                           overflow: TextOverflow.visible,
                           style: TextStyle(

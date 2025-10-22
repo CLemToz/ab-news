@@ -21,6 +21,7 @@ class WPPost {
     required this.featuredImage,
     required this.categoriesNames,
     required this.categoriesIds,
+
   });
 
   // ---- DISPLAY GETTERS ----

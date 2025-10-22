@@ -206,6 +206,7 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: RecentNewsItem(
                         article: p,
+                        displayCategory: _resolveCategoryName(p), // ✅ add this
                         onTap: () => _openArticle(p),
                       ),
                     );
@@ -217,6 +218,19 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
       ),
     );
   }
+
+  String _resolveCategoryName(WPPost post) {
+    if (post.categoriesNames.isNotEmpty) {
+      return post.categoriesNames.first;         // from _embedded
+    }
+    if (post.categoriesIds.isNotEmpty) {         // try cache by ID
+      final id = post.categoriesIds.first;
+      final cached = _CategoryNameCache.get(id);
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+    return widget.category;                       // fallback: screen title
+  }
+
 }
 
 class _RecentSkeleton extends StatelessWidget {
@@ -279,4 +293,10 @@ class _RecentSkeleton extends StatelessWidget {
       Container(width: w, height: 22, decoration: BoxDecoration(color: cs.surfaceVariant, borderRadius: BorderRadius.circular(12)));
   Widget _dot(ColorScheme cs) =>
       Container(width: 4, height: 4, decoration: BoxDecoration(color: cs.outline, shape: BoxShape.circle));
+}
+
+class _CategoryNameCache {
+  static final Map<int, String> _map = {};
+  static void set(int id, String name) => _map[id] = name;
+  static String? get(int id) => _map[id];
 }
