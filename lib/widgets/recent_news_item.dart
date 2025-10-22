@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../data/mock_data.dart'; // your articles source
-import 'common.dart';            // TagChip
+import 'common.dart'; // TagChip
 
 class RecentNewsItem extends StatefulWidget {
   final dynamic article; // NewsArticle from mock_data.dart
   final VoidCallback? onTap;
   final bool initiallySaved;
 
+  /// When provided, this text is shown in the chip
+  /// (use the screen's category so it always matches the section).
+  final String? displayCategory;
+
   const RecentNewsItem({
     super.key,
     required this.article,
     this.onTap,
     this.initiallySaved = false,
+    this.displayCategory,
   });
 
   @override
@@ -25,7 +30,7 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
 
   // Tune these to make the image a bit larger
   static const double _thumbW = 120; // wider image
-  static const double _thumbH = 120; // ~16:10 look with round corners
+  static const double _thumbH = 120; // square-ish with round corners
 
   @override
   void initState() {
@@ -35,14 +40,18 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
 
   /// Safe getter to avoid NoSuchMethodError on dynamic
   T? _get<T>(T? Function() read) {
-    try { return read(); } catch (_) { return null; }
+    try {
+      return read();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _shareOnWhatsApp() async {
     final title = _get<String>(() => widget.article.title) ?? '';
-    final url   = _get<String>(() => widget.article.url) ?? '';
-    final text  = Uri.encodeComponent('$title ${url.isNotEmpty ? url : ''}');
-    final uri   = Uri.parse('whatsapp://send?text=$text');
+    final url = _get<String>(() => widget.article.url) ?? '';
+    final text = Uri.encodeComponent('$title ${url.isNotEmpty ? url : ''}');
+    final uri = Uri.parse('whatsapp://send?text=$text');
 
     try {
       if (await canLaunchUrl(uri)) {
@@ -61,22 +70,29 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
 
   @override
   Widget build(BuildContext context) {
-    final a  = widget.article;
+    final a = widget.article;
     final cs = Theme.of(context).colorScheme;
 
     final title = _get<String>(() => a.title) ?? '';
-    final desc  = _get<String>(() => a.summary) ??
+    final desc =
+        _get<String>(() => a.summary) ??
         _get<String>(() => a.subtitle) ??
         _get<String>(() => a.excerpt) ??
         '';
-    final image = _get<String>(() => a.imageUrl) ??
-        _get<String>(() => a.thumbnail) ?? '';
-    final category = _get<String>(() => a.category) ?? 'General';
-    final dateText = _get<String>(() => a.timeAgo) ??
+    final image =
+        _get<String>(() => a.imageUrl) ?? _get<String>(() => a.thumbnail) ?? '';
+    final categoryFromPost = _get<String>(() => a.category) ?? 'General';
+    final category = (widget.displayCategory?.trim().isNotEmpty ?? false)
+        ? widget.displayCategory!.trim()
+        : categoryFromPost;
+
+    final dateText =
+        _get<String>(() => a.timeAgo) ??
         _get<String>(() => a.publishedAtString) ??
         _get<String>(() => a.published) ??
-        _get<String>(() => a.dateString) ?? '•';
-    final isVideo  = _get<bool>(() => a.isVideo) ?? false;
+        _get<String>(() => a.dateString) ??
+        '';
+    final isVideo = _get<bool>(() => a.isVideo) ?? false;
     final duration = _get<String>(() => a.videoDuration) ?? '';
 
     return Material(
@@ -106,10 +122,11 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
                             title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.25,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.25,
+                                ),
                           ),
                           if (desc.isNotEmpty) ...[
                             const SizedBox(height: 6),
@@ -118,10 +135,11 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
                               desc,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                height: 1.25,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    height: 1.25,
+                                  ),
                             ),
                           ],
                         ],
@@ -142,10 +160,11 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
                           child: image.isEmpty
                               ? _thumbPlaceholder(cs)
                               : Image.network(
-                            image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _thumbPlaceholder(cs),
-                          ),
+                                  image,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      _thumbPlaceholder(cs),
+                                ),
                         ),
                         if (isVideo)
                           Container(
@@ -154,16 +173,26 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
                             decoration: BoxDecoration(
                               color: Colors.black54,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white70, width: 1),
+                              border: Border.all(
+                                color: Colors.white70,
+                                width: 1,
+                              ),
                             ),
-                            child: const Icon(Icons.play_arrow, color: Colors.white, size: 20),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
                         if (duration.isNotEmpty)
                           Positioned(
                             right: 6,
                             bottom: 6,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black87,
                                 borderRadius: BorderRadius.circular(6),
@@ -186,55 +215,58 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
 
               const SizedBox(height: 12),
 
-              // ------- Meta row (left) + actions (right) -------
+              // ------- Meta & actions (time moved to its own line) -------
               Row(
                 children: [
-                  // Meta
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TagChip(text: category),
-                        const SizedBox(width: 8),
-                        Icon(Icons.circle, size: 4, color: cs.outline),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            dateText,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: cs.onSurfaceVariant,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  TagChip(text: category),
+
+                  // Full-width time (NO truncation)
+                  if (dateText.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(left: 8.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          dateText,
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-
-                      ],
+                      ),
                     ),
-                  ),
-
                   const Spacer(),
-
-                  // Actions
                   _iconBtn(
                     onPressed: _shareOnWhatsApp,
                     tooltip: 'Share on WhatsApp',
-                    child: const FaIcon(FontAwesomeIcons.whatsapp,
-                        color: Color(0xFF25D366), size: 20),
+                    child: const FaIcon(
+                      FontAwesomeIcons.whatsapp,
+                      color: Color(0xFF25D366),
+                      size: 20,
+                    ),
                   ),
                   _iconBtn(
                     onPressed: () => setState(() => _saved = !_saved),
                     tooltip: _saved ? 'Saved' : 'Save',
-                    child: Icon(_saved ? Icons.bookmark : Icons.bookmark_border, size: 22),
+                    child: Icon(
+                      _saved ? Icons.bookmark : Icons.bookmark_border,
+                      size: 22,
+                    ),
                   ),
                 ],
               ),
+              const SizedBox(height: 6),
 
               // subtle divider for card separation
               Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: Divider(height: 1, color: cs.outlineVariant.withOpacity(.5)),
+                child: Divider(
+                  height: 1,
+                  color: cs.outlineVariant.withOpacity(.5),
+                ),
               ),
             ],
           ),
@@ -244,7 +276,11 @@ class _RecentNewsItemState extends State<RecentNewsItem> {
   }
 
   // Compact icon button to avoid overflow
-  Widget _iconBtn({required Widget child, String? tooltip, VoidCallback? onPressed}) {
+  Widget _iconBtn({
+    required Widget child,
+    String? tooltip,
+    VoidCallback? onPressed,
+  }) {
     return IconButton(
       onPressed: onPressed,
       tooltip: tooltip,

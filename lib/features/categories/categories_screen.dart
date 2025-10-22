@@ -181,7 +181,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         centerTitle: false,
         titleSpacing: 0,
         title: const Padding(
-          padding: EdgeInsets.only(left: 0),
+          padding: EdgeInsets.only(left: 18),
           child: Text(
             'Categories',
             style: TextStyle(
@@ -275,7 +275,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => CategoryNewsScreen(category: c.name),
+                              builder: (_) => CategoryNewsScreen(
+                                category: c.name,  // visible title
+                                categoryId: c.id,  // IMPORTANT: pass the ID
+                              ),
                             ),
                           );
                         },
