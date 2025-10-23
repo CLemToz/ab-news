@@ -1,17 +1,26 @@
+// lib/services/wp_api.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
+
 import '../config/wp.dart';
 import '../models/wp_post.dart';
 
 class WpApi {
-  static Uri _postsUri({int? categoryId, int page = 1, int perPage = 10}) {
+  // -------------------------------
+  // Build posts URI
+  // -------------------------------
+  static Uri _postsUri({
+    int? categoryId,
+    int page = 1,
+    int perPage = 10,
+  }) {
     final base = '${WPConfig.baseUrl}/wp-json/wp/v2/posts';
     final qp = <String, String>{
       'per_page': '$perPage',
       'page': '$page',
-      '_embed': '1',
-      '_fields':
-      'id,date_gmt,link,title,excerpt,content,_embedded,categories',
+      '_embed': '1', // <-- keep this to receive wp:featuredmedia + wp:term
+      // IMPORTANT: do NOT include `_fields` here or you'll lose wp:term
     };
     if (categoryId != null && categoryId > 0) {
       qp['categories'] = '$categoryId';
@@ -19,24 +28,126 @@ class WpApi {
     return Uri.parse(base).replace(queryParameters: qp);
   }
 
-  static Future<List<WPPost>> fetchPosts({int? categoryId, int page = 1}) async {
+  // -------------------------------
+  // Fetch posts (optionally by category)
+  // -------------------------------
+  static Future<List<WPPost>> fetchPosts({
+    int? categoryId,
+    int page = 1,
+    int perPage = 10,
+  }) async {
     if (WPConfig.baseUrl.isEmpty) {
       throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
     }
 
-    final res = await http.get(_postsUri(categoryId: categoryId, page: page));
+    final uri = _postsUri(categoryId: categoryId, page: page, perPage: perPage);
+    final res = await http.get(uri);
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${res.reasonPhrase}');
     }
 
-    final List data = jsonDecode(res.body);
-    return data.map<WPPost>((j) => _mapPost(j)).toList();
+    final List data = jsonDecode(res.body) as List;
+    return data.map<WPPost>((j) => _mapPost(j as Map<String, dynamic>)).toList();
   }
 
+  // Newest site-wide (latest first)
+  static Future<List<WPPost>> fetchRecent({
+    int perPage = 10,
+    int page = 1,
+  }) =>
+      fetchPosts(perPage: perPage, page: page);
+
+  // -------------------------------
+  // Category helpers
+  // -------------------------------
+
+  /// Returns a category ID for a given slug (e.g. 'breaking-news').
+  /// Used by the slider when you don't want to hardcode the ID.
+  static Future<int?> fetchCategoryIdBySlug(String slug) async {
+    if (WPConfig.baseUrl.isEmpty) {
+      throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
+    }
+
+    final uri = Uri.parse('${WPConfig.baseUrl}/wp-json/wp/v2/categories')
+        .replace(queryParameters: {
+      'slug': slug,
+      'per_page': '1',
+      '_fields': 'id,slug',
+    });
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      debugPrint('fetchCategoryIdBySlug → HTTP ${res.statusCode}');
+      return null;
+    }
+
+    try {
+      final List data = jsonDecode(res.body) as List;
+      if (data.isEmpty) return null;
+      final first = data.first as Map<String, dynamic>;
+      final id = first['id'];
+      return (id is int) ? id : int.tryParse('$id');
+    } catch (e) {
+      debugPrint('fetchCategoryIdBySlug parse error: $e');
+      return null;
+    }
+  }
+
+  /// Backwards-compatible alias if some files call `getCategoryIdBySlug`.
+  static Future<int?> getCategoryIdBySlug(String slug) =>
+      fetchCategoryIdBySlug(slug);
+
+  /// Fetch newest posts from the “Breaking” category.
+  /// If you already know the category ID, pass [categoryIdOverride] to skip slug lookup.
+  static Future<List<WPPost>> fetchBreaking({
+    String slug = 'breaking-news',
+    int perPage = 5,
+    int? categoryIdOverride,
+  }) async {
+    int? catId = categoryIdOverride;
+    catId ??= await fetchCategoryIdBySlug(slug);
+    if (catId == null) return <WPPost>[];
+    return fetchPosts(categoryId: catId, perPage: perPage, page: 1);
+  }
+
+  // -------------------------------
+// Search posts by text
+// -------------------------------
+  static Future<List<WPPost>> searchPosts(
+      String query, {
+        int perPage = 20,
+        int page = 1,
+      }) async {
+    if (WPConfig.baseUrl.isEmpty) {
+      throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
+    }
+
+    final uri = Uri.parse('${WPConfig.baseUrl}/wp-json/wp/v2/posts').replace(
+      queryParameters: {
+        'search': query,
+        'per_page': '$perPage',
+        'page': '$page',
+        '_embed': '1', // keep this so we get images + categories
+      },
+    );
+
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('HTTP ${res.statusCode}: ${res.reasonPhrase}');
+    }
+
+    final List data = jsonDecode(res.body) as List;
+    return data.map<WPPost>((j) => _mapPost(j as Map<String, dynamic>)).toList();
+  }
+
+
+  // -------------------------------
+  // Map raw WP JSON → WPPost
+  // -------------------------------
   static WPPost _mapPost(Map<String, dynamic> j) {
     String? featured;
 
-    // ---- 1) Featured media (prefer a sized URL) ----
+    // 1) Featured media from _embedded
     try {
       final media = j['_embedded']?['wp:featuredmedia'];
       if (media is List && media.isNotEmpty) {
@@ -45,7 +156,6 @@ class WpApi {
         if (md is Map) {
           final sizes = md['sizes'];
           if (sizes is Map) {
-            // try medium_large / large / medium / full
             for (final key in ['medium_large', 'large', 'medium', 'full']) {
               final entry = sizes[key];
               if (entry is Map && entry['source_url'] != null) {
@@ -55,12 +165,11 @@ class WpApi {
             }
           }
         }
-        // fallback to source_url if still empty
         featured ??= (m['source_url'] ?? '').toString();
       }
     } catch (_) {}
 
-    // ---- 2) Fallback: first <img src="..."> inside content HTML ----
+    // 2) Fallback: first <img> in content HTML
     if (featured == null || featured.isEmpty) {
       try {
         final html = (j['content']?['rendered'] ?? '').toString();
@@ -75,7 +184,7 @@ class WpApi {
       } catch (_) {}
     }
 
-    // ---- 3) Category names from _embedded terms ----
+    // 3) Category names from _embedded → wp:term
     final catNames = <String>[];
     try {
       final terms = j['_embedded']?['wp:term'];
@@ -93,7 +202,7 @@ class WpApi {
       }
     } catch (_) {}
 
-    // ---- 4) Category IDs ----
+    // 4) Category IDs (numeric)
     final catIds = <int>[];
     try {
       final list = j['categories'];
@@ -105,11 +214,11 @@ class WpApi {
       }
     } catch (_) {}
 
-    // ---- 5) Date ----
-    final dateStr = (j['date_gmt'] ?? '').toString();
+    // 5) Date (UTC)
+    final dateStr = (j['date_gmt'] ?? j['date'] ?? '').toString();
     final dt = DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
 
-// ---- 6) Fallback image ----
+    // 6) Fallback image
     featured ??= 'https://via.placeholder.com/600x400?text=No+Image';
     if (featured.isEmpty) {
       featured = 'https://via.placeholder.com/600x400?text=No+Image';

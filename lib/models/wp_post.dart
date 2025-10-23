@@ -21,10 +21,89 @@ class WPPost {
     required this.featuredImage,
     required this.categoriesNames,
     required this.categoriesIds,
-
   });
 
-  // ---- DISPLAY GETTERS ----
+  // ---------------------------------------------------------------------------
+  // NEW: Safe factory for WP REST v2 `/wp-json/wp/v2/posts?_embed=1`
+  // ---------------------------------------------------------------------------
+  factory WPPost.fromWpV2(Map<String, dynamic> j) {
+    String _rendered(Map? o, String k) =>
+        (o != null && o[k] is String) ? (o[k] as String) : '';
+
+    DateTime _parseDate() {
+      final d = (j['date_gmt'] ?? j['date'])?.toString();
+      try {
+        return DateTime.parse(d!).toUtc();
+      } catch (_) {
+        return DateTime.now().toUtc();
+      }
+    }
+
+    String? _featuredFromEmbed() {
+      try {
+        final emb = j['_embedded'];
+        if (emb is Map &&
+            emb['wp:featuredmedia'] is List &&
+            emb['wp:featuredmedia'].isNotEmpty) {
+          final m = emb['wp:featuredmedia'][0];
+          if (m is Map && m['source_url'] is String) {
+            return m['source_url'] as String;
+          }
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    List<int> _categoryIds() {
+      final raw = j['categories'];
+      if (raw is List) {
+        return raw.whereType<int>().toList();
+      }
+      return const <int>[];
+    }
+
+    List<String> _categoryNamesFromEmbed() {
+      try {
+        final emb = j['_embedded'];
+        if (emb is Map && emb['wp:term'] is List) {
+          // wp:term is a list of tax arrays; categories are taxonomy 'category'
+          final terms = emb['wp:term'] as List;
+          for (final tax in terms) {
+            if (tax is List && tax.isNotEmpty) {
+              // find the category array
+              if ((tax.first is Map) &&
+                  ((tax.first as Map)['taxonomy'] == 'category')) {
+                return tax
+                    .whereType<Map>()
+                    .map((m) => (m['name'] ?? '').toString())
+                    .where((s) => s.isNotEmpty)
+                    .toList();
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      return const <String>[];
+    }
+
+    return WPPost(
+      id: j['id'] ?? 0,
+      titleRendered: _rendered(j['title'], 'rendered'),
+      excerptRendered: _rendered(j['excerpt'], 'rendered'),
+      contentRendered: _rendered(j['content'], 'rendered'),
+      dateGmt: _parseDate(),
+      link: (j['link'] ?? '').toString(),
+      featuredImage: _featuredFromEmbed(),
+      categoriesNames: _categoryNamesFromEmbed(),
+      categoriesIds: _categoryIds(),
+    );
+  }
+
+  /// Convenience to map a list response
+  static List<WPPost> listFromWpV2(List<dynamic> arr) =>
+      arr.whereType<Map<String, dynamic>>().map(WPPost.fromWpV2).toList();
+
+  // ---- DISPLAY GETTERS (unchanged) ----
   String get title   => _decodeHtml(_stripHtml(titleRendered));
   String get summary => _decodeHtml(_stripHtml(excerptRendered));
   String get body    => _decodeHtml(_stripHtml(contentRendered));
@@ -46,7 +125,7 @@ class WPPost {
     return DateFormat('d MMM, yyyy • h:mm a').format(dateGmt.toLocal());
   }
 
-  // ---- HELPERS ----
+  // ---- HELPERS (unchanged) ----
   static String _stripHtml(String html) =>
       html.replaceAll(RegExp(r'<[^>]*>'), '').replaceAll('&nbsp;', ' ').trim();
 

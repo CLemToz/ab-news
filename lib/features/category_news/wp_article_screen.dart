@@ -112,9 +112,7 @@ class WpArticleScreen extends StatelessWidget {
               // You can switch this to an AssetImage if you’ve added your logo to assets
               const CircleAvatar(
                 radius: 16,
-                backgroundImage: NetworkImage(
-                  'https://i.ibb.co/5KgdZw1/Untitled-design-36.jpg', // DK News Plus logo
-                ),
+                backgroundImage: AssetImage('assets/faviconsize.jpg'),
               ),
               const SizedBox(width: 10),
               Text(
