@@ -13,6 +13,7 @@ import '../../widgets/empty_videos_state.dart';
 import '../../widgets/news_shimmers.dart';
 import '../../widgets/portrait_video_thumb.dart';
 import '../../widgets/recent_news_item.dart';
+import '../auth/login_screen.dart';
 
 // 🔥 WP API + models
 import '../../services/wp_api.dart';
@@ -81,10 +82,26 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showLoginDialog() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Login',
+      pageBuilder: (context, animation1, animation2) => const LoginScreen(),
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: child,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 200),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final recentsMock = articles.take(6).toList(); // still used in other areas if needed
+    // final recentsMock = articles.take(6).toList(); // still used in other areas if needed
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
@@ -109,6 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.wb_cloudy_outlined, color: Brand.red),
                     const SizedBox(width: 6),
                     Text('29°', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.login),
+                      tooltip: 'Login / Sign Up',
+                      onPressed: _showLoginDialog,
+                    ),
                   ])
                 ],
               ),

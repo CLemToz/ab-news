@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../config/wp.dart';
-import '../../theme/brand.dart';
 import '../category_news/category_news_screen.dart';
 
 /// WP Category (with optional imageUrl provided by your plugin)
@@ -175,8 +174,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Brand.red,
-        foregroundColor: Colors.white,
+        backgroundColor: cs.secondary,
+        foregroundColor: cs.onSecondary,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         centerTitle: false,
         titleSpacing: 0,
@@ -185,7 +184,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           child: Text(
             'Categories',
             style: TextStyle(
-              color: Colors.white,
               fontWeight: FontWeight.w700,
               fontSize: 18,
             ),
@@ -194,7 +192,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        color: Brand.red,
+        color: cs.secondary,
         onRefresh: _refresh,
         child: CustomScrollView(
           slivers: [
@@ -244,8 +242,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 10),
                         FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: Brand.red, foregroundColor: Colors.white),
                           onPressed: _fetch,
                           child: const Text('Retry'),
                         ),
@@ -320,7 +316,7 @@ class _SearchField extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Brand.red, width: 1.3),
+          borderSide: BorderSide(color: cs.secondary, width: 1.3),
           borderRadius: BorderRadius.circular(12),
         ),
       ),
@@ -387,9 +383,9 @@ class _CategoryTile extends StatelessWidget {
                     Expanded(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(.92),
+                          color: cs.surface.withOpacity(.92),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withOpacity(.4)),
+                          border: Border.all(color: cs.surface.withOpacity(.4)),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -405,10 +401,10 @@ class _CategoryTile extends StatelessWidget {
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: Brand.red, borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: cs.secondary, borderRadius: BorderRadius.circular(8)),
                         child: Text(
                           badge!,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                          style: TextStyle(color: cs.onSecondary, fontWeight: FontWeight.w700, fontSize: 12),
                         ),
                       ),
                     ],
