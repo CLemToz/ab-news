@@ -13,14 +13,13 @@ import '../../widgets/empty_videos_state.dart';
 import '../../widgets/news_shimmers.dart';
 import '../../widgets/portrait_video_thumb.dart';
 import '../../widgets/recent_news_item.dart';
-import '../auth/login_screen.dart';
 
-// 🔥 WP API + models
+// WP API + models
 import '../../services/wp_api.dart';
 import '../../models/wp_post.dart';
 import '../category_news/wp_article_screen.dart';
 
-// 🔥 Rounded, auto-playing slider fed by WP
+// Rounded, auto-playing slider fed by WP
 import '../../widgets/breaking_news_section.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -35,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _hasError = false;
   bool _isLoadingAll = false;
 
-  // 👉 Change this to your real Breaking category ID
+  // Your Breaking category ID
   static const int _breakingCategoryId = 398;
 
   Future<void> _refreshAll() async {
@@ -47,16 +46,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await Future.delayed(const Duration(seconds: 2));
-      setState(() {
-        _isLoadingVideos = false;
-        _isLoadingAll = false;
-      });
-    } catch (_) {
-      setState(() {
-        _isLoadingVideos = false;
-        _isLoadingAll = false;
-        _hasError = true;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingVideos = false;
+          _isLoadingAll = false;
+        });
+      }
     }
   }
 
@@ -82,26 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showLoginDialog() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Login',
-      pageBuilder: (context, animation1, animation2) => const LoginScreen(),
-      transitionBuilder: (context, anim1, anim2, child) {
-        return FadeTransition(
-          opacity: anim1,
-          child: child,
-        );
-      },
-      transitionDuration: const Duration(milliseconds: 200),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // final recentsMock = articles.take(6).toList(); // still used in other areas if needed
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
@@ -118,7 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Bhilai', style: Theme.of(context).textTheme.headlineSmall),
-                        Text("Here's your news feed", style: TextStyle(color: cs.onSurfaceVariant)),
+                        Text("Here's your news feed",
+                            style: TextStyle(color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ),
@@ -126,12 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.wb_cloudy_outlined, color: Brand.red),
                     const SizedBox(width: 6),
                     Text('29°', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.login),
-                      tooltip: 'Login / Sign Up',
-                      onPressed: _showLoginDialog,
-                    ),
                   ])
                 ],
               ),
@@ -175,7 +149,8 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Brand.red,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               onViewAll: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ReelsScreen()));
+                Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const ReelsScreen()));
               },
             ),
           ),
@@ -188,7 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'HIGHLIGHTED CATEGORIES',
               color: Brand.red,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              onViewAll: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoriesScreen())),
+              onViewAll: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const CategoriesScreen())),
             ),
           ),
           if (_isLoadingAll)
@@ -241,11 +217,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: List.generate(list.length, (i) {
                     final p = list[i];
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: RecentNewsItem(
                         article: p,
                         onTap: () => _openArticle(context, p),
-                        displayCategory: p.category, // chip stays correct
+                        displayCategory: p.category, // chip shows post category
                       ),
                     );
                   }),
@@ -293,9 +270,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+          Icon(Icons.error_outline,
+              size: 48, color: Theme.of(context).colorScheme.error),
           const SizedBox(height: 12),
-          Text('Failed to load videos', style: Theme.of(context).textTheme.titleMedium),
+          Text('Failed to load videos',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           FilledButton.tonal(onPressed: _refreshAll, child: const Text('Try Again')),
         ],
@@ -332,7 +311,8 @@ class _RecentAllScreen extends StatelessWidget {
             final list = snap.data ?? const <WPPost>[];
             if (list.isEmpty) {
               return Center(
-                child: Text('No recent news', style: TextStyle(color: cs.onSurfaceVariant)),
+                child:
+                Text('No recent news', style: TextStyle(color: cs.onSurfaceVariant)),
               );
             }
             return ListView.separated(

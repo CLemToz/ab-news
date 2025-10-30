@@ -14,7 +14,7 @@ class ArticleScreen extends StatelessWidget {
     // Safe helpers in case some fields are null/empty
     String _v(String? s) => (s ?? '').trim();
     final String category = _v(article.category).isEmpty ? 'News' : _v(article.category);
-    final String author   = _v(article.author).isEmpty ? 'DK News Plus' : _v(article.author);
+    final String author   = _v(article.author).isEmpty ? 'DA News Plus' : _v(article.author);
     final String imageUrl = _v(article.imageUrl);
 
     return Scaffold(
@@ -85,7 +85,7 @@ class ArticleScreen extends StatelessWidget {
           // Author row (logo avatar + author + time info)
           Row(
             children: [
-              // Replace avatar with DK News Plus logo asset (safe fallback)
+              // Replace avatar with DA News Plus logo asset (safe fallback)
               CircleAvatar(
                 radius: 16,
                 backgroundColor: cs.surfaceVariant,

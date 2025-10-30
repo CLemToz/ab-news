@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-import '../../features/auth/auth_provider.dart';
 import '../../theme/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -11,8 +8,6 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -23,7 +18,18 @@ class SettingsScreen extends StatelessWidget {
             valueListenable: themeProvider,
             builder: (context, themeMode, child) {
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      'Theme',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   RadioListTile<ThemeMode>(
                     title: const Text('System'),
                     value: ThemeMode.system,
@@ -48,10 +54,16 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Logout'),
+            leading: const Icon(Icons.info_outline),
+            title: const Text('About App'),
+            subtitle: const Text('Version 1.0.0'),
             onTap: () {
-              authProvider.logout();
+              showAboutDialog(
+                context: context,
+                applicationName: 'DA News Plus',
+                applicationVersion: '1.0.0',
+                applicationLegalese: '© 2025 DA News Plus',
+              );
             },
           ),
         ],

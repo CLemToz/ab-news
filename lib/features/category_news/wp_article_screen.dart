@@ -21,7 +21,7 @@ class WpArticleScreen extends StatelessWidget {
   Future<void> _shareOnWhatsApp(BuildContext context) async {
     final title = post.title.isNotEmpty ? "📰 *${post.title.trim()}*" : '';
     final link = post.url.isNotEmpty ? "\n👉 ${post.url}" : '';
-    final message = Uri.encodeComponent("$title$link\n\n📱 Read this on DK News Plus App!");
+    final message = Uri.encodeComponent("$title$link\n\n📱 Read this on DA News Plus App!");
 
     final deepLink = Uri.parse('whatsapp://send?text=$message');
     final webLink  = Uri.parse('https://wa.me/?text=$message');
@@ -116,7 +116,7 @@ class WpArticleScreen extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                "DK News Plus",
+                "DA News Plus",
                 style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 10),
