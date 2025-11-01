@@ -12,19 +12,25 @@ import 'package:fwfh_chewie/fwfh_chewie.dart' as fwfh_chewie;
 import '../../models/wp_post.dart';
 import '../../theme/brand.dart';
 import '../../widgets/common.dart';
+import '../../services/save_manager.dart'; // ✅ added import for save feature
 
-class WpArticleScreen extends StatelessWidget {
+class WpArticleScreen extends StatefulWidget {
   final WPPost post;
   const WpArticleScreen({super.key, required this.post});
 
+  @override
+  State<WpArticleScreen> createState() => _WpArticleScreenState();
+}
+
+class _WpArticleScreenState extends State<WpArticleScreen> {
   // --- WhatsApp Share ---
   Future<void> _shareOnWhatsApp(BuildContext context) async {
-    final title = post.title.isNotEmpty ? "📰 *${post.title.trim()}*" : '';
-    final link = post.url.isNotEmpty ? "\n👉 ${post.url}" : '';
+    final title = widget.post.title.isNotEmpty ? "📰 *${widget.post.title.trim()}*" : '';
+    final link = widget.post.url.isNotEmpty ? "\n👉 ${widget.post.url}" : '';
     final message = Uri.encodeComponent("$title$link\n\n📱 Read this on DA News Plus App!");
 
     final deepLink = Uri.parse('whatsapp://send?text=$message');
-    final webLink  = Uri.parse('https://wa.me/?text=$message');
+    final webLink = Uri.parse('https://wa.me/?text=$message');
 
     try {
       if (await canLaunchUrl(deepLink)) {
@@ -48,25 +54,54 @@ class WpArticleScreen extends StatelessWidget {
         backgroundColor: Brand.red,
         foregroundColor: Colors.white,
         title: Text(
-          post.title,
+          widget.post.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(Icons.bookmark_border),
+
+        // ✅ Save/Unsave functionality (Bookmark)
+        actions: [
+          FutureBuilder<bool>(
+            future: SaveManager.isSaved(widget.post.id),
+            builder: (context, snapshot) {
+              final isSaved = snapshot.data ?? false;
+              return IconButton(
+                tooltip: isSaved ? 'Remove from Saved' : 'Save Article',
+                icon: Icon(
+                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  color: Colors.white,
+                ),
+                onPressed: () async {
+                  if (isSaved) {
+                    await SaveManager.remove(widget.post);
+                  } else {
+                    await SaveManager.save(widget.post);
+                  }
+                  setState(() {}); // refresh icon
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isSaved
+                          ? 'Removed from saved'
+                          : 'Saved for later reading'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+              );
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
+
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          // Top row: category chip + WA share (replaces views)
+          // Top row: category chip + WA share
           Row(
             children: [
-              TagChip(text: post.category.isNotEmpty ? post.category : 'News'),
+              TagChip(text: widget.post.category.isNotEmpty ? widget.post.category : 'News'),
               const Spacer(),
               IconButton(
                 tooltip: 'Share on WhatsApp',
@@ -84,7 +119,7 @@ class WpArticleScreen extends StatelessWidget {
 
           // Title
           Text(
-            post.title,
+            widget.post.title,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               height: 1.3,
@@ -94,11 +129,11 @@ class WpArticleScreen extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Featured image (graceful fallback)
-          if (post.imageUrl.isNotEmpty)
+          if (widget.post.imageUrl.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.network(
-                post.imageUrl,
+                widget.post.imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _imageFallback(cs),
               ),
@@ -109,7 +144,6 @@ class WpArticleScreen extends StatelessWidget {
           // Author & time
           Row(
             children: [
-              // You can switch this to an AssetImage if you’ve added your logo to assets
               const CircleAvatar(
                 radius: 16,
                 backgroundImage: AssetImage('assets/faviconsize.jpg'),
@@ -120,25 +154,26 @@ class WpArticleScreen extends StatelessWidget {
                 style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 10),
-              Text('•  ${post.timeAgo}', style: TextStyle(color: cs.onSurfaceVariant)),
+              Text('•  ${widget.post.timeAgo}',
+                  style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
 
           const SizedBox(height: 16),
 
-          // FULL HTML body (images, <video>, svg, links; iframe opens externally)
-          _ArticleHtml(html: post.contentRendered),
+          // Full HTML body
+          _ArticleHtml(html: widget.post.contentRendered),
 
           const SizedBox(height: 16),
           SafeArea(
-            minimum: const EdgeInsets.fromLTRB(0, 0, 0, 8), // avoids nav bar / notches
+            minimum: const EdgeInsets.fromLTRB(0, 0, 0, 8),
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: Brand.red,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              onPressed: () => Share.share(post.url),
+              onPressed: () => Share.share(widget.post.url),
               icon: const Icon(Icons.share),
               label: const Text('Share'),
             ),
@@ -236,6 +271,6 @@ class _ArticleHtml extends StatelessWidget {
 //
 class _WPHtmlFactory extends WidgetFactory
     with
-        CachedNetworkImageFactory,     // <img> with caching
-        fwfh_chewie.ChewieFactory,     // <video> with Chewie/VideoPlayer
-        SvgFactory {}                  // inline SVGs
+        CachedNetworkImageFactory, // <img> with caching
+        fwfh_chewie.ChewieFactory, // <video> with Chewie/VideoPlayer
+        SvgFactory {} // inline SVGs

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'brand.dart';
 
 class AppTheme {
@@ -19,8 +20,9 @@ class AppTheme {
     return base.copyWith(
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: Colors.black, // Changed to black for light theme
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark, // Ensures dark icons on status bar
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -62,6 +64,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light, // Ensures light icons on status bar
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

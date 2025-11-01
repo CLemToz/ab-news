@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../data/mock_data.dart'; // your articles source
 import 'common.dart'; // TagChip
+import '../models/wp_post.dart';
+import 'save_toggle_button.dart';
 
 class RecentNewsItem extends StatefulWidget {
   final dynamic article; // NewsArticle from mock_data.dart

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // ✅ added for icons
 
 import '../../theme/brand.dart'; // Brand.red
 import '../../data/mock_data.dart';
@@ -13,6 +14,8 @@ import '../../widgets/empty_videos_state.dart';
 import '../../widgets/news_shimmers.dart';
 import '../../widgets/portrait_video_thumb.dart';
 import '../../widgets/recent_news_item.dart';
+import '../saved/saved_news_screen.dart';
+
 
 // WP API + models
 import '../../services/wp_api.dart';
@@ -91,31 +94,61 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bhilai', style: Theme.of(context).textTheme.headlineSmall),
-                        Text("Here's your news feed",
-                            style: TextStyle(color: cs.onSurfaceVariant)),
-                      ],
-                    ),
+                  // ✅ Left side: logo + name
+                  Row(
+                    children: [
+                      Image.asset(
+                        'assets/faviconsize.jpg', // ✅ your DA News logo
+                        height: 40,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'DA News Plus',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
-                  Row(children: [
-                    Icon(Icons.wb_cloudy_outlined, color: Brand.red),
-                    const SizedBox(width: 6),
-                    Text('29°', style: Theme.of(context).textTheme.titleMedium),
-                  ])
+
+                  // ✅ Right side: Notification + Saved icons
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(FontAwesomeIcons.bell),
+                        onPressed: () {
+                          // TODO: Add Notification screen navigation
+                        },
+                        color: Brand.red,
+                      ),
+                      IconButton(
+                        icon: const Icon(FontAwesomeIcons.bookmark),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SavedNewsScreen()),
+                          );
+                        },
+                        color: Brand.red,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
+
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           const SliverToBoxAdapter(child: TickerStrip(text: tickerText)),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-          const SliverToBoxAdapter(child: QuickReadCard()),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
+          // ✅ Replaced QuickReadCard → TrendingNewsCard
+          const SliverToBoxAdapter(child: TrendingNewsCard()),
+          const SliverToBoxAdapter(child: SizedBox(height: 2)),
 
           // -------- BREAKING NEWS (API slider) --------
           SliverToBoxAdapter(
@@ -230,7 +263,6 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 0)),
         ],
       ),
@@ -284,6 +316,68 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// -------------------------------
+/// Trending News Card (replacement)
+/// -------------------------------
+class TrendingNewsCard extends StatelessWidget {
+  const TrendingNewsCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          height: 40,
+          width: 40,
+          decoration: BoxDecoration(
+            color: Brand.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(FontAwesomeIcons.fireFlameCurved, color: Colors.redAccent),
+        ),
+        title: const Text(
+          'Trending News',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        subtitle: const Text(
+          'Stay updated with top trending stories.',
+          style: TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+        trailing: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Brand.red,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: () {
+            // TODO: Navigate to trending page
+          },
+          child: const Text(
+            'See',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// -------------------------------
 /// View All screen for Recent News
 /// -------------------------------
 class _RecentAllScreen extends StatelessWidget {
@@ -311,8 +405,8 @@ class _RecentAllScreen extends StatelessWidget {
             final list = snap.data ?? const <WPPost>[];
             if (list.isEmpty) {
               return Center(
-                child:
-                Text('No recent news', style: TextStyle(color: cs.onSurfaceVariant)),
+                child: Text('No recent news',
+                    style: TextStyle(color: cs.onSurfaceVariant)),
               );
             }
             return ListView.separated(

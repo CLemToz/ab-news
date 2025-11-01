@@ -51,6 +51,7 @@ dependencies:
   fwfh_svg: ^0.16.1
   fwfh_chewie: ^0.16.1
 
+
   cached_network_image: ^3.4.1        # you already use this elsewhere
   url_launcher: ^6.3.0
   chewie: ^1.7.5                       # video player used by fwfh_chewie

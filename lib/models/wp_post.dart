@@ -148,4 +148,31 @@ class WPPost {
     });
     return out;
   }
+
+  factory WPPost.fromJson(Map<String, dynamic> json) {
+    return WPPost(
+      id: json['id'] ?? 0,
+      titleRendered: json['titleRendered'] ?? '',
+      excerptRendered: json['excerptRendered'] ?? '',
+      contentRendered: json['contentRendered'] ?? '',
+      dateGmt: DateTime.tryParse(json['dateGmt'] ?? '') ?? DateTime.now(),
+      link: json['link'] ?? '',
+      featuredImage: json['featuredImage'],
+      categoriesNames: (json['categoriesNames'] as List?)?.cast<String>() ?? [],
+      categoriesIds: (json['categoriesIds'] as List?)?.cast<int>() ?? [],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'titleRendered': titleRendered,
+    'excerptRendered': excerptRendered,
+    'contentRendered': contentRendered,
+    'dateGmt': dateGmt.toIso8601String(),
+    'link': link,
+    'featuredImage': featuredImage,
+    'categoriesNames': categoriesNames,
+    'categoriesIds': categoriesIds,
+  };
+
 }
