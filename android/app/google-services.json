@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "556294544343",
+    "project_id": "da-news-plus",
+    "storage_bucket": "da-news-plus.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:556294544343:android:5b56b0948d1c7760828992",
+        "android_client_info": {
+          "package_name": "com.plus.danews"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1lwjRrgKzFMvj7V54vi0Ojb_UmYjOB2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
