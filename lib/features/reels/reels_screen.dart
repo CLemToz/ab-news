@@ -1,416 +1,544 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import '../../services/wp_reels_api.dart';
+import '../../models/wp_reel.dart';
+import '../../theme/brand.dart'; // keep using your Brand file
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../data/mock_data.dart';     // reels list
-import '../../models/reel_item.dart';   // ReelItem model
-import '../../widgets/common.dart';     // TagChip
 
-/// Full-bleed Reels screen (like IG/YT Shorts).
-/// - [initialIndex]: open at a specific reel
-/// - [onExit]: if provided, shows a back button even as a tab and calls this
-///             when user taps back (e.g., switch to Home tab).
+
 class ReelsScreen extends StatefulWidget {
   final int initialIndex;
-  final VoidCallback? onExit;
-  const ReelsScreen({super.key, this.initialIndex = 0, this.onExit});
+  const ReelsScreen({super.key, this.initialIndex = 0});
 
   @override
   State<ReelsScreen> createState() => _ReelsScreenState();
 }
 
 class _ReelsScreenState extends State<ReelsScreen> {
-  late final PageController _pc;
-  late int _active;
+  final PageController _page = PageController();
+  final Map<int, VideoPlayerController> _controllers = {};
+  final _rng = Random();
+  final List<WPReel> _items = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _active = widget.initialIndex.clamp(0, reels.length - 1);
-    _pc = PageController(initialPage: _active);
+  int _current = 0;
+  bool _loading = true;
+  bool _error = false;
 
-    // Edge-to-edge chrome (transparent bars) for true full-bleed
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _pc.dispose();
-    super.dispose();
-  }
-
-  Future<void> _handleBack() async {
-    // If opened via push, pop. Else call onExit (tab flow).
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-      return;
-    }
-    if (widget.onExit != null) {
-      widget.onExit!();
-      return;
-    }
-    // Fallback: go to app root (change '/' if your root route differs)
-    if (mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (r) => false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final showBack = Navigator.of(context).canPop() || widget.onExit != null;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          PageView.builder(
-            controller: _pc,
-            scrollDirection: Axis.vertical,
-            onPageChanged: (i) => setState(() => _active = i),
-            itemCount: reels.length,
-            itemBuilder: (_, i) => ReelTile(
-              key: ValueKey(reels[i].id),
-              item: reels[i],
-              active: i == _active,
-            ),
-          ),
-
-          if (showBack)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 8,
-              left: 12,
-              child: GestureDetector(
-                onTap: _handleBack,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-
-          const Positioned(
-            top: 12,
-            left: 52,
-            child: Text(
-              'Reels',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/* ============================== TILE ============================== */
-
-class ReelTile extends StatefulWidget {
-  final ReelItem item;
-  final bool active;
-  const ReelTile({super.key, required this.item, required this.active});
-
-  @override
-  State<ReelTile> createState() => _ReelTileState();
-}
-
-class _ReelTileState extends State<ReelTile> {
-  VideoPlayerController? _vc;
-  bool _ready = false, _error = false, _muted = false, _liked = false, _saved = false;
-
-  // minimal controls (tap to show/hide)
-  bool _controlsVisible = false;
+  bool _showControls = false;
+  bool _showPauseOverlay = false;
   Timer? _hideTimer;
-
-  // progress
-  Duration _pos = Duration.zero, _dur = Duration.zero;
-  late final VoidCallback _listener;
+  Timer? _pauseOverlayTimer;
 
   @override
   void initState() {
     super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      _vc = VideoPlayerController.network(widget.item.videoUrl)
-        ..setLooping(true)
-        ..setVolume(_muted ? 0 : 1);
-
-      await _vc!.initialize();
-      if (!mounted) return;
-
-      _listener = () {
-        if (!mounted) return;
-        setState(() {
-          _pos = _vc!.value.position;
-          _dur = _vc!.value.duration;
-        });
-      };
-      _vc!.addListener(_listener);
-
-      setState(() => _ready = true);
-      if (widget.active) _vc!.play();
-    } catch (_) {
-      if (mounted) setState(() { _error = true; _ready = false; });
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant ReelTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_ready && !_error) {
-      if (widget.active) {
-        _vc?.play();
-      } else {
-        _vc?.pause();
-        _hide(immediate: true);
-      }
-    }
+    _fetch();
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
-    if (_vc != null) {
-      _vc!.removeListener(_listener);
-      _vc!.dispose();
+    _pauseOverlayTimer?.cancel();
+    for (final c in _controllers.values) {
+      c.dispose();
     }
+    _page.dispose();
     super.dispose();
   }
 
-  /* --------------------------- helpers ---------------------------- */
-
-  void _show() { setState(() => _controlsVisible = true); _autoHide(); }
-  void _hide({bool immediate = false}) {
-    _hideTimer?.cancel();
-    if (immediate) setState(() => _controlsVisible = false);
+  Future<void> _fetch() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final fresh = await WpReelsApi.fetchRecent(perPage: 10);
+      if (!mounted) return;
+      fresh.shuffle(_rng);
+      _items
+        ..clear()
+        ..addAll(fresh);
+      setState(() => _loading = false);
+      _ensureController(_current);
+      _ensureController(_current + 1);
+      _playOnly(_current);
+      if (_items.isNotEmpty) {
+        // fire-and-forget
+        WpReelsApi.incrementView(_items[_current].id);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = true;
+      });
+    }
   }
-  void _autoHide() {
+
+  void _playOnly(int index) {
+    _controllers.forEach((i, c) {
+      if (!c.value.isInitialized) return;
+      if (i == index) {
+        c.seekTo(Duration.zero); // always from start
+        c.setVolume(1.0);        // play with sound by default
+        c.play();
+      } else {
+        c.pause();
+      }
+    });
+    // ensure overlay off after page change
+    setState(() => _showPauseOverlay = false);
+  }
+
+  Future<void> _ensureController(int index) async {
+    if (index < 0 || index >= _items.length) return;
+    if (_controllers.containsKey(index)) return;
+
+    final reel = _items[index];
+    final url = reel.videoUrl.isNotEmpty ? reel.videoUrl : reel.hlsUrl;
+    if (url.isEmpty) return;
+
+    final c = VideoPlayerController.networkUrl(Uri.parse(url));
+    _controllers[index] = c;
+
+    try {
+      await c.initialize();
+      c.setLooping(true);
+      c.setVolume(1.0);
+
+      // ✅ Auto-play immediately if this is the current visible video
+      if (index == _current) {
+        c.seekTo(Duration.zero);
+        c.play();
+      }
+
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Video init error: $e');
+    }
+  }
+
+  void _onPageChanged(int i) {
+    setState(() => _current = i);
+    _playOnly(i);
+    _ensureController(i + 1);
+
+    if (i >= 0 && i < _items.length) {
+      WpReelsApi.incrementView(_items[i].id);
+    }
+    // infinite/random: append a shuffled copy when near end
+    if (i >= _items.length - 2) {
+      final extra = List<WPReel>.from(_items)..shuffle(_rng);
+      setState(() => _items.addAll(extra));
+    }
+    // hide controls on page switch
+    _toggleControls(force: false);
+  }
+
+  void _toggleControls({bool? force}) {
+    final next = force ?? !_showControls;
+    setState(() => _showControls = next);
     _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _controlsVisible = false);
+    if (next) {
+      _hideTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _showControls = false);
+      });
+    }
+  }
+
+  void _showPauseIconTemporarily() {
+    setState(() => _showPauseOverlay = true);
+    _pauseOverlayTimer?.cancel();
+    _pauseOverlayTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _showPauseOverlay = false);
     });
   }
 
-  void _onScreenTap() {
-    if (!_ready || _error) return;
-    if (_controlsVisible) {
-      _hide(immediate: true);
+  /// Single source of truth to play/pause the **current** video,
+  /// update UI, show overlay, and keep controls in sync.
+  void _playPauseCurrent() {
+    final c = _controllers[_current];
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
     } else {
-      _show();
+      c.play();
     }
+    setState(() {});           // refresh icons everywhere
+    _showPauseIconTemporarily();
+    _toggleControls(force: true); // reveal controls briefly
   }
 
-  void _togglePlayPause() {
-    if (_vc!.value.isPlaying) { _vc!.pause(); } else { _vc!.play(); }
-    setState(() {});
-    _autoHide();
+  void _toggleMuteCurrent() {
+    final c = _controllers[_current];
+    if (c == null || !c.value.isInitialized) return;
+    c.setVolume(c.value.volume == 0 ? 1.0 : 0.0);
+    setState(() {}); // refresh mute icon
   }
-
-  void _toggleMute() {
-    setState(() => _muted = !_muted);
-    _vc!.setVolume(_muted ? 0 : 1);
-    _autoHide();
-  }
-
-  void _seek(double vMs) => _vc!.seekTo(Duration(milliseconds: vMs.toInt()));
-  void _toggleLike() => setState(() => _liked = !_liked);
-  void _toggleSave() => setState(() => _saved = !_saved);
-  void _share() => debugPrint('Share: ${widget.item.title} ${widget.item.videoUrl}');
-  String _fmt(Duration d) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    final h = d.inHours, m = d.inMinutes.remainder(60), s = d.inSeconds.remainder(60);
-    return h > 0 ? '${two(h)}:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
-  }
-
-  /* ------------------------------ UI ------------------------------ */
 
   @override
   Widget build(BuildContext context) {
-    final pad = MediaQuery.of(context).padding; // Only safe insets; no big gaps
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error) {
+      return Center(
+        child: FilledButton(
+          onPressed: _fetch,
+          child: const Text('Retry'),
+        ),
+      );
+    }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _onScreenTap,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (_ready && !_error)
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: _vc!.value.size.width,
-                height: _vc!.value.size.height,
-                child: VideoPlayer(_vc!),
-              ),
-            )
-          else if (_error)
-            Container(
-              color: Colors.black,
-              child: const Center(child: Icon(Icons.error_outline, color: Colors.white54, size: 48)),
-            )
-          else
-            Stack(children: [
-              Image.network(widget.item.coverImage, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-              const Center(child: CircularProgressIndicator(color: Colors.white)),
-            ]),
-
-          // bottom gradient (tweak opacity here if you want: .85 → darker)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(.85), Colors.transparent, Colors.transparent],
-                    stops: const [0, .35, 1],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // info text
-          Positioned(
-            left: 16, right: 90, bottom: 16 + pad.bottom,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TagChip(text: widget.item.category),
-                const SizedBox(height: 10),
-                Text(widget.item.title,
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                Text(widget.item.subtitle,
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70)),
-              ],
-            ),
-          ),
-
-          // right action rail
-          Positioned(
-            right: 12, bottom: 16 + pad.bottom,
-            child: Column(
-              children: [
-                _RailBtn(icon: _liked ? Icons.favorite : Icons.favorite_border, color: _liked ? Colors.red : Colors.white, label: 'Like', onTap: _toggleLike),
-                const SizedBox(height: 16),
-                _RailBtn(icon: _saved ? Icons.bookmark : Icons.bookmark_border, color: _saved ? Colors.yellow : Colors.white, label: 'Save', onTap: _toggleSave),
-                const SizedBox(height: 16),
-                _RailBtn(icon: Icons.share_outlined, color: Colors.white, label: 'Share', onTap: _share),
-                const SizedBox(height: 16),
-                _RailBtn(icon: _muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, label: _muted ? 'Muted' : 'Sound', onTap: _toggleMute),
-              ],
-            ),
-          ),
-
-          // minimal controls bar (appears on tap)
-          if (_ready && _controlsVisible)
-            Positioned(
-              left: 12, right: 12, bottom: 12 + pad.bottom,
-              child: _MiniControls(
-                playing: _vc!.value.isPlaying,
-                muted: _muted,
-                pos: _pos,
-                dur: _dur,
-                seek: _seek,
-                togglePlay: _togglePlayPause,
-                toggleMute: _toggleMute,
-                fmt: _fmt,
-              ),
-            ),
-        ],
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: PageView.builder(
+          controller: _page,
+          scrollDirection: Axis.vertical,
+          onPageChanged: _onPageChanged,
+          itemCount: _items.length,
+          itemBuilder: (_, i) {
+            final reel = _items[i];
+            final c = _controllers[i];
+            return _ReelPage(
+              reel: reel,
+              controller: c,
+              isCurrent: i == _current,
+              showControls: _showControls,
+              showPauseOverlay: _showPauseOverlay,
+              onTapAnywherePlayPause: _playPauseCurrent, // 👈 tap anywhere toggles play/pause
+              onCenterOverlayTap: _playPauseCurrent,     // 👈 center icon toggles play/pause
+              onToggleMute: _toggleMuteCurrent,
+              onShare: () => Share.share(reel.link ?? reel.videoUrl ?? ''),
+              onLike: () => WpReelsApi.like(reel.id),
+              requestRebuild: () => setState(() {}), // for bottom controls to refresh icons
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-/* ----------------- small widgets ----------------- */
+class _ReelPage extends StatelessWidget {
+  final WPReel reel;
+  final VideoPlayerController? controller;
+  final bool isCurrent;
+  final bool showControls;
+  final bool showPauseOverlay;
 
-class _RailBtn extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap; final Color color;
-  const _RailBtn({required this.icon, required this.label, required this.onTap, required this.color});
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    customBorder: const CircleBorder(),
-    child: Column(
-      children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ],
-    ),
-  );
-}
+  final VoidCallback onTapAnywherePlayPause;
+  final VoidCallback onCenterOverlayTap;
+  final VoidCallback onToggleMute;
+  final VoidCallback onShare;
+  final Future<void> Function() onLike;
+  final VoidCallback requestRebuild;
 
-class _MiniControls extends StatelessWidget {
-  final bool playing, muted;
-  final Duration pos, dur;
-  final ValueChanged<double> seek;
-  final VoidCallback togglePlay, toggleMute;
-  final String Function(Duration) fmt;
-  const _MiniControls({
-    required this.playing, required this.muted, required this.pos, required this.dur,
-    required this.seek, required this.togglePlay, required this.toggleMute, required this.fmt,
+  const _ReelPage({
+    required this.reel,
+    required this.controller,
+    required this.isCurrent,
+    required this.showControls,
+    required this.showPauseOverlay,
+    required this.onTapAnywherePlayPause,
+    required this.onCenterOverlayTap,
+    required this.onToggleMute,
+    required this.onShare,
+    required this.onLike,
+    required this.requestRebuild,
   });
 
   @override
   Widget build(BuildContext context) {
-    final total = (dur.inMilliseconds == 0 ? 1 : dur.inMilliseconds).toDouble();
-    final value = pos.inMilliseconds.clamp(0, total).toDouble();
+    final hasVideo = controller != null && controller!.value.isInitialized;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.55), // controls bg opacity
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        /// ▶ Video Player + overlay tint
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: onTapAnywherePlayPause,
+          onDoubleTap: onLike,
+          child: hasVideo
+              ? Stack(
+            fit: StackFit.expand,
             children: [
-              Text(fmt(pos), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              Expanded(
-                child: Slider(
-                  value: value, min: 0, max: total,
-                  onChanged: seek,
-                  activeColor: Colors.white, inactiveColor: Colors.white24,
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller!.value.size.width,
+                  height: controller!.value.size.height,
+                  child: VideoPlayer(controller!),
                 ),
               ),
-              Text(fmt(dur), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              // Slight dark overlay for readability
+              Container(color: Colors.black.withOpacity(0.25)),
             ],
+          )
+              : Container(color: Colors.black),
+        ),
+
+        /// 🔙 Top AppBar with Back Button and "News"
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Text(
+                  "News",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          Row(
+        ),
+
+        /// 📝 Title block
+        Positioned(
+          left: 14,
+          right: 88,
+          bottom: 20,
+          child: SafeArea(
+            child: Text(
+              reel.titleRendered ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+
+        /// 💬 Right-side interactive buttons
+        Positioned(
+          right: 14,
+          bottom: 90,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              IconButton(
-                onPressed: togglePlay,
-                icon: Icon(playing ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                splashRadius: 20,
+              _ReelActionButton(
+                icon: FontAwesomeIcons.download,
+                label: "डाउनलोड",
+                onTap: () {},
               ),
-              const Spacer(),
-              IconButton(
-                onPressed: toggleMute,
-                icon: Icon(muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
-                splashRadius: 20,
+              const SizedBox(height: 16),
+              _ReelActionButton(
+                icon: FontAwesomeIcons.solidHeart,
+                label: "पसंद",
+                onTap: () async {
+                  await onLike();
+                },
+              ),
+              const SizedBox(height: 16),
+              _ReelActionButton(
+                icon: FontAwesomeIcons.solidComment,
+                label: "कमेंट",
+                onTap: () {},
+              ),
+              const SizedBox(height: 16),
+              _ReelActionButton(
+                icon: FontAwesomeIcons.whatsapp,
+                label: "शेयर",
+                onTap: onShare,
               ),
             ],
           ),
-        ],
+        ),
+
+        /// 🎛 Bottom playback controls
+        if (showControls && hasVideo)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 10,
+            child: _BottomControls(
+              controller: controller!,
+              onPlayPause: onTapAnywherePlayPause,
+              onToggleMute: onToggleMute,
+              requestRebuild: requestRebuild,
+            ),
+          ),
+
+        /// ⏸ Center pause/play overlay
+        if (showPauseOverlay)
+          Center(
+            child: GestureDetector(
+              onTap: onCenterOverlayTap,
+              child: Icon(
+                (controller?.value.isPlaying ?? false)
+                    ? Icons.pause_circle
+                    : Icons.play_circle,
+                color: Colors.white.withOpacity(0.9),
+                size: 90,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 🎯 Helper button widget for right-side controls
+class _ReelActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ReelActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(40),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: const Padding(
+          padding: EdgeInsets.all(12.0),
+          child: Icon(Icons.circle, color: Colors.transparent), // will be replaced by IconTheme below
+        ),
+      ),
+    );
+  }
+}
+
+// Replace icon inside _RoundButton via IconTheme to keep ripple size consistent
+// (Alternative: inline Icon(icon, color: Colors.white) inside Padding in _RoundButton)
+extension on _RoundButton {
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black54,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Icon(icon, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomControls extends StatelessWidget {
+  final VideoPlayerController controller;
+  final VoidCallback onPlayPause;
+  final VoidCallback onToggleMute;
+  final VoidCallback requestRebuild;
+
+  const _BottomControls({
+    required this.controller,
+    required this.onPlayPause,
+    required this.onToggleMute,
+    required this.requestRebuild,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPlaying = controller.value.isPlaying;
+    final isMuted = controller.value.volume == 0;
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(.45),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.replay_5, color: Colors.white),
+              onPressed: () async {
+                final pos = controller.value.position - const Duration(seconds: 5);
+                await controller.seekTo(pos > Duration.zero ? pos : Duration.zero);
+                requestRebuild();
+              },
+            ),
+            IconButton(
+              icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+              onPressed: () {
+                onPlayPause();       // 👈 use shared toggler so all UI stays in sync
+                requestRebuild();
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.forward_5, color: Colors.white),
+              onPressed: () async {
+                final pos = controller.value.position + const Duration(seconds: 5);
+                await controller.seekTo(pos);
+                requestRebuild();
+              },
+            ),
+            IconButton(
+              icon: Icon(isMuted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
+              onPressed: () {
+                onToggleMute();
+                requestRebuild();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

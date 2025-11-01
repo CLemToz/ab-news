@@ -40,6 +40,8 @@ dependencies:
   intl: ^0.20.2
   share_plus: ^12.0.1
   html_unescape: ^2.0.0
+  visibility_detector: ^0.4.0+2
+
 
   # HTML renderer (core)
   flutter_widget_from_html: ^0.17.1
