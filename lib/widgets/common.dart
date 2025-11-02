@@ -65,9 +65,24 @@ class TagChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-      child: Text(text, style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.w600)),
+      constraints: const BoxConstraints(
+        maxWidth: 120, // ✅ Limit chip width
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.surfaceVariant,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis, // ✅ Truncate long text
+        style: TextStyle(
+          color: cs.onSurfaceVariant,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -81,35 +96,59 @@ class TickerStrip extends StatefulWidget {
   State<TickerStrip> createState() => _TickerStripState();
 }
 
-class _TickerStripState extends State<TickerStrip> with SingleTickerProviderStateMixin {
+class _TickerStripState extends State<TickerStrip> {
   late final ScrollController _sc;
-  late final AnimationController _ac;
 
   @override
   void initState() {
     super.initState();
     _sc = ScrollController();
-    _ac = AnimationController(vsync: this, duration: const Duration(seconds: 15))
-      ..addStatusListener((s) {
-        if (s == AnimationStatus.completed) {
-          _sc.jumpTo(0);
-          _ac.forward(from: 0);
-        }
-      })
-      ..addListener(() {
-        if (_sc.hasClients) {
-          final max = _sc.position.maxScrollExtent;
-          _sc.jumpTo(max * _ac.value);
-        }
-      })
-      ..forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startScrolling();
+    });
   }
 
   @override
   void dispose() {
-    _ac.dispose();
     _sc.dispose();
     super.dispose();
+  }
+
+  void _startScrolling() async {
+    if (!mounted) return;
+    // Define speed, e.g., 35 pixels per second
+    const double pixelsPerSecond = 35.0;
+
+    while (mounted) {
+      // small delay between loops
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted || !_sc.hasClients) return;
+
+      final maxScroll = _sc.position.maxScrollExtent;
+      final durationInSeconds = maxScroll / pixelsPerSecond;
+
+      // don't animate if not overflowing
+      if (durationInSeconds <= 0) {
+        await Future.delayed(const Duration(seconds: 2));
+        continue;
+      }
+      
+      if (!mounted) return;
+
+      // Animate to end
+      await _sc.animateTo(
+        maxScroll,
+        duration: Duration(seconds: durationInSeconds.round()),
+        curve: Curves.linear,
+      );
+
+      // Wait a bit at the end before jumping
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted || !_sc.hasClients) return;
+
+      // Jump back to start for the loop
+      _sc.jumpTo(0);
+    }
   }
 
   @override
@@ -125,7 +164,9 @@ class _TickerStripState extends State<TickerStrip> with SingleTickerProviderStat
         children: [
           const SizedBox(width: 16),
           Center(child: Text(widget.text, style: TextStyle(color: cs.onSurfaceVariant))),
-          const SizedBox(width: 32),
+          const SizedBox(width: 32), // gap between repetitions
+          Center(child: Text(widget.text, style: TextStyle(color: cs.onSurfaceVariant))),
+          const SizedBox(width: 16),
         ],
       ),
     );
@@ -245,4 +286,3 @@ class HorizontalCategoryList extends StatelessWidget {
     );
   }
 }
-

@@ -34,10 +34,34 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  video_player: ^2.10.0
   shared_preferences: ^2.5.3
-  url_launcher: ^6.3.0
   font_awesome_flutter: ^10.7.0
+  http: ^1.2.0
+  intl: ^0.20.2
+  share_plus: ^12.0.1
+  html_unescape: ^2.0.0
+  visibility_detector: ^0.4.0+2
+  firebase_core: ^3.5.0
+  firebase_messaging: ^15.0.4
+  flutter_local_notifications: ^17.2.2
+
+
+
+  # HTML renderer (core)
+  flutter_widget_from_html: ^0.17.1
+  # Helpers (make images/video/links work nicely inside HTML)
+  flutter_widget_from_html_core: ^0.17.0
+  fwfh_cached_network_image: ^0.16.1
+  fwfh_svg: ^0.16.1
+  fwfh_chewie: ^0.16.1
+
+
+  cached_network_image: ^3.4.1        # you already use this elsewhere
+  url_launcher: ^6.3.0
+  chewie: ^1.7.5                       # video player used by fwfh_chewie
+  video_player: ^2.9.2
+  provider: ^6.1.2
+  dio: ^5.7.0
 
 dev_dependencies:
   flutter_test:
@@ -63,6 +87,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/faviconsize.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -102,4 +128,3 @@ flutter_launcher_icons:
   image_path: "assets/DA News Plus.jpg" # path to your logo
   adaptive_icon_background: "#ffffff"  # or your theme color
   adaptive_icon_foreground: "assets/DA News Plus.jpg"
-

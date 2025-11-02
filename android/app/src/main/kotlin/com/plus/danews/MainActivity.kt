@@ -1,4 +1,4 @@
-package com.example.android_studio
+package com.plus.danews
 
 import io.flutter.embedding.android.FlutterActivity
 
