@@ -3,9 +3,10 @@
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Media / storage (safe across API levels) -->
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />-->
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />-->
+    <!-- Android 13+ notification runtime permission (required for FCM heads-up) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Media / storage (kept exactly as you had) -->
     <!-- For older devices pre-T (scoped storage not available) -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -18,6 +19,22 @@
         android:label="DA News Plus"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true">
+
+        <!-- Default notification channel id used by FCM if you don't specify one in the message.
+             Make sure your app creates a channel with this id at startup. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="news_channel" />
+
+        <!-- (Optional but recommended) default small icon/color for system notifications
+             Uncomment and point to your resources if you have them.
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brand_red" />
+        -->
 
         <activity
             android:name=".MainActivity"
@@ -34,8 +51,8 @@
                 android:resource="@style/NormalTheme" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
@@ -45,11 +62,11 @@
             android:value="2" />
     </application>
 
-    <!-- Package visibility: used by Flutter text processing plugin -->
+    <!-- Package visibility: used by Flutter text processing plugin (kept) -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 </manifest>

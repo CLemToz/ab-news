@@ -236,4 +236,36 @@ class WpApi {
       categoriesIds: catIds,
     );
   }
+
+  /// Fetch a single post by ID (with _embed for image/categories).
+  static Future<WPPost?> fetchPostById(int id) async {
+    final uri = Uri.parse(
+      '${WPConfig.baseUrl}/wp-json/wp/v2/posts/$id?_embed=1'
+          '&_fields=id,date_gmt,link,title,excerpt,content,_embedded,categories',
+    );
+    final res = await http.get(uri);
+    if (res.statusCode != 200) return null;
+    final Map<String, dynamic> j = jsonDecode(res.body);
+    return _mapPost(j);
+  }
+
+  /// Fetch a single post by its link (permalink). Tries to resolve via WP Search.
+  static Future<WPPost?> fetchPostByLink(String link) async {
+    try {
+      // Use WP search endpoint by URL
+      final uri = Uri.parse(
+        '${WPConfig.baseUrl}/wp-json/wp/v2/search?_embed=1&search=${Uri.encodeQueryComponent(link)}&per_page=1',
+      );
+      final res = await http.get(uri);
+      if (res.statusCode != 200) return null;
+      final List list = jsonDecode(res.body);
+      if (list.isEmpty) return null;
+      final int? id = (list.first as Map)['id'] is int ? (list.first as Map)['id'] as int : null;
+      if (id == null) return null;
+      return fetchPostById(id);
+    } catch (_) {
+      return null;
+    }
+  }
+
 }
