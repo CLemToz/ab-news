@@ -25,7 +25,8 @@ class _SavedNewsScreenState extends State<SavedNewsScreen> {
   Future<void> _load() async {
     final list = await SaveManager.getAll();
     setState(() {
-      _saved = list;
+      // ✅ newest saved first in UI
+      _saved = (list).reversed.toList();
       _loading = false;
     });
   }
@@ -43,6 +44,7 @@ class _SavedNewsScreenState extends State<SavedNewsScreen> {
           : _saved.isEmpty
           ? const Center(child: Text('No saved articles'))
           : RefreshIndicator(
+        color: Brand.red,
         onRefresh: _load,
         child: ListView.separated(
           padding: const EdgeInsets.all(16),
@@ -53,13 +55,16 @@ class _SavedNewsScreenState extends State<SavedNewsScreen> {
             return RecentNewsItem(
               article: post,
               displayCategory: post.category,
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                // open article; when coming back, reflect any save/unsave changes
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => WpArticleScreen(post: post),
                   ),
                 );
+                if (!mounted) return;
+                _load();
               },
             );
           },
