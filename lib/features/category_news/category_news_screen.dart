@@ -52,7 +52,6 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
     final res = await http.get(uri);
     if (res.statusCode != 200) return null;
     final list = jsonDecode(res.body) as List;
-    // exact match preferred
     for (final m in list) {
       if ((m['name'] ?? '').toString().trim() == name.trim()) {
         return m['id'] as int?;
@@ -81,12 +80,10 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
         setState(() => _loadingMore = true);
       }
 
-      // Ensure we have a categoryId (if WP is configured)
       if (_resolvedCategoryId == null && WPConfig.baseUrl.isNotEmpty) {
         _resolvedCategoryId = await _resolveCategoryIdByName(widget.category);
       }
 
-      // Fetch (server filter if we have id; else fetch & client filter)
       List<WPPost> batch;
       if (_resolvedCategoryId != null && _resolvedCategoryId! > 0) {
         batch = await WpApi.fetchPosts(categoryId: _resolvedCategoryId, page: _page);
@@ -206,13 +203,18 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       child: RecentNewsItem(
                         article: p,
-                        displayCategory: _resolveCategoryName(p), // ✅ add this
+                        displayCategory: _resolveCategoryName(p),
                         onTap: () => _openArticle(p),
                       ),
                     );
                   },
                 ),
               ),
+
+            // ✅ Add bottom padding spacer here
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 100),
+            ),
           ],
         ),
       ),
@@ -221,16 +223,15 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
 
   String _resolveCategoryName(WPPost post) {
     if (post.categoriesNames.isNotEmpty) {
-      return post.categoriesNames.first;         // from _embedded
+      return post.categoriesNames.first;
     }
-    if (post.categoriesIds.isNotEmpty) {         // try cache by ID
+    if (post.categoriesIds.isNotEmpty) {
       final id = post.categoriesIds.first;
       final cached = _CategoryNameCache.get(id);
       if (cached != null && cached.isNotEmpty) return cached;
     }
-    return widget.category;                       // fallback: screen title
+    return widget.category;
   }
-
 }
 
 class _RecentSkeleton extends StatelessWidget {
@@ -275,7 +276,7 @@ class _RecentSkeleton extends StatelessWidget {
             ),
             Container(
               width: 200,
-              height: 124,
+              height: 500,
               decoration: BoxDecoration(
                 color: cs.surfaceVariant,
                 borderRadius: BorderRadius.circular(16),

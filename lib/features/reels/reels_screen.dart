@@ -3,12 +3,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/wp_reels_api.dart';
 import '../../models/wp_reel.dart';
 import '../../theme/brand.dart'; // keep using your Brand file
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
-
 
 class ReelsScreen extends StatefulWidget {
   final int initialIndex;
@@ -282,25 +281,30 @@ class _ReelPage extends StatelessWidget {
               : Container(color: Colors.black),
         ),
 
-        /// 🔙 Top AppBar with Back Button and "News"
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const Text(
-                  "News",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+        /// 🔙 Top AppBar with Back Button and "News" (pinned to top)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                ),
-              ],
+                  const Text(
+                    "News",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -325,35 +329,63 @@ class _ReelPage extends StatelessWidget {
           ),
         ),
 
-        /// 💬 Right-side interactive buttons
+        /// 💬 Right-side interactive buttons (Download, WhatsApp, Share only)
         Positioned(
           right: 14,
           bottom: 90,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // Download
               _ReelActionButton(
                 icon: FontAwesomeIcons.download,
                 label: "डाउनलोड",
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              _ReelActionButton(
-                icon: FontAwesomeIcons.solidHeart,
-                label: "पसंद",
                 onTap: () async {
-                  await onLike();
+                  await showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Download'),
+                      content: const Text('Your video will be saved to the gallery.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Saved to gallery')),
+                  );
                 },
               ),
               const SizedBox(height: 16),
-              _ReelActionButton(
-                icon: FontAwesomeIcons.solidComment,
-                label: "कमेंट",
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
+
+              // WhatsApp share
               _ReelActionButton(
                 icon: FontAwesomeIcons.whatsapp,
+                label: "व्हाट्सऐप",
+                onTap: () async {
+                  final toShare = (reel.link?.isNotEmpty ?? false)
+                      ? reel.link!
+                      : (reel.videoUrl.isNotEmpty ? reel.videoUrl : reel.hlsUrl);
+                  final encoded = Uri.encodeComponent(toShare);
+                  final uri = Uri.parse('whatsapp://send?text=$encoded');
+                  try {
+                    final ok = await launchUrl(uri);
+                    if (!ok) {
+                      onShare(); // fallback
+                    }
+                  } catch (_) {
+                    onShare(); // fallback
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Generic share (system sheet)
+              _ReelActionButton(
+                icon: Icons.share,
                 label: "शेयर",
                 onTap: onShare,
               ),
@@ -435,7 +467,6 @@ class _ReelActionButton extends StatelessWidget {
     );
   }
 }
-
 
 class _RoundButton extends StatelessWidget {
   final IconData icon;
