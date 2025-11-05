@@ -12,7 +12,7 @@ import 'package:fwfh_chewie/fwfh_chewie.dart' as fwfh_chewie;
 import '../../models/wp_post.dart';
 import '../../theme/brand.dart';
 import '../../widgets/common.dart';
-import '../../services/save_manager.dart'; // ✅ added import for save feature
+import '../../services/save_manager.dart'; // saving
 
 class WpArticleScreen extends StatefulWidget {
   final WPPost post;
@@ -23,26 +23,60 @@ class WpArticleScreen extends StatefulWidget {
 }
 
 class _WpArticleScreenState extends State<WpArticleScreen> {
+  // --- helpers ---
+  Future<void> _safeLaunch(Uri uri, {LaunchMode mode = LaunchMode.platformDefault}) async {
+    try {
+      await launchUrl(uri, mode: mode);
+    } catch (_) {}
+  }
+
+  // Compose a unified share message
+  String get _shareMessagePlain {
+    final title = widget.post.title.isNotEmpty ? "📰 ${widget.post.title.trim()}" : '';
+    final link = widget.post.url.isNotEmpty ? "\n👉 ${widget.post.url}" : '';
+    return "$title$link\n\n📱 Read this on DA News Plus App!";
+  }
+
   // --- WhatsApp Share ---
   Future<void> _shareOnWhatsApp(BuildContext context) async {
-    final title = widget.post.title.isNotEmpty ? "📰 *${widget.post.title.trim()}*" : '';
-    final link = widget.post.url.isNotEmpty ? "\n👉 ${widget.post.url}" : '';
-    final message = Uri.encodeComponent("$title$link\n\n📱 Read this on DA News Plus App!");
-
+    final message = Uri.encodeComponent(_shareMessagePlain);
     final deepLink = Uri.parse('whatsapp://send?text=$message');
     final webLink = Uri.parse('https://wa.me/?text=$message');
 
     try {
       if (await canLaunchUrl(deepLink)) {
-        await launchUrl(deepLink);
+        await _safeLaunch(deepLink);
       } else {
-        await launchUrl(webLink, mode: LaunchMode.externalApplication);
+        await _safeLaunch(webLink, mode: LaunchMode.externalApplication);
       }
     } catch (_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Unable to open WhatsApp')),
       );
     }
+  }
+
+  // --- X (formerly Twitter) ---
+  Future<void> _shareOnX() async {
+    final text = Uri.encodeComponent(widget.post.title);
+    final url = Uri.encodeComponent(widget.post.url);
+    final xUrl = Uri.parse('https://twitter.com/intent/tweet?text=$text&url=$url');
+    await _safeLaunch(xUrl, mode: LaunchMode.externalApplication);
+  }
+
+
+
+
+  // --- Facebook ---
+  Future<void> _shareOnFacebook() async {
+    final url = Uri.encodeComponent(widget.post.url);
+    final fb = Uri.parse('https://www.facebook.com/sharer/sharer.php?u=$url');
+    await _safeLaunch(fb, mode: LaunchMode.externalApplication);
+  }
+
+  // --- Default Share (system sheet) ---
+  Future<void> _shareSystem() async {
+    await Share.share(_shareMessagePlain);
   }
 
   @override
@@ -59,8 +93,6 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-
-        // ✅ Save/Unsave functionality (Bookmark)
         actions: [
           FutureBuilder<bool>(
             future: SaveManager.isSaved(widget.post.id),
@@ -78,7 +110,7 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
                   } else {
                     await SaveManager.save(widget.post);
                   }
-                  setState(() {}); // refresh icon
+                  setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(isSaved
@@ -98,19 +130,46 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          // Top row: category chip + WA share
+          // Top row: category chip + share buttons (System, X, FB, WA)
           Row(
             children: [
               TagChip(text: widget.post.category.isNotEmpty ? widget.post.category : 'News'),
               const Spacer(),
               IconButton(
+                tooltip: 'Share',
+                onPressed: _shareSystem,
+                icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 22),
+              ),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                return Container(
+                  decoration: isDark
+                      ? BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  )
+                      : null,
+                  padding: const EdgeInsets.all(1),
+                  child: IconButton(
+                    tooltip: 'Share on X',
+                    onPressed: _shareOnX,
+                    icon: FaIcon(
+                      FontAwesomeIcons.squareXTwitter,
+                      color: isDark ? Colors.black : Colors.black87,
+                      size: 20,
+                    ),
+                  ),
+                );
+              }),
+              IconButton(
+                tooltip: 'Share on Facebook',
+                onPressed: _shareOnFacebook,
+                icon: const FaIcon(FontAwesomeIcons.facebook, color: Color(0xFF1877F2), size: 20),
+              ),
+              IconButton(
                 tooltip: 'Share on WhatsApp',
                 onPressed: () => _shareOnWhatsApp(context),
-                icon: const FaIcon(
-                  FontAwesomeIcons.whatsapp,
-                  color: Color(0xFF25D366),
-                  size: 22,
-                ),
+                icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 22),
               ),
             ],
           ),
@@ -141,20 +200,22 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
 
           const SizedBox(height: 12),
 
-          // Author & time
-          Row(
+          // Author & time — wrapped (prevents overflow)
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const CircleAvatar(
                 radius: 16,
                 backgroundImage: AssetImage('assets/faviconsize.jpg'),
               ),
-              const SizedBox(width: 10),
               Text(
                 "DA News Plus",
                 style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(width: 10),
               Text('•  ${widget.post.timeAgo}',
+                  softWrap: true,
                   style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
@@ -190,9 +251,6 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
   );
 }
 
-//
-// HTML renderer widget (no fwfh_webview; iframes open externally)
-//
 class _ArticleHtml extends StatelessWidget {
   final String html;
   const _ArticleHtml({required this.html});
@@ -206,8 +264,6 @@ class _ArticleHtml extends StatelessWidget {
       factoryBuilder: () => _WPHtmlFactory(),
       textStyle: textStyle,
       renderMode: RenderMode.column,
-
-      // Convert <iframe src="..."> to a tappable card that opens externally
       customWidgetBuilder: (element) {
         if (element.localName == 'iframe') {
           final src = element.attributes['src'] ?? '';
@@ -224,18 +280,13 @@ class _ArticleHtml extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  'Open video',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+                child: const Text('Open video', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
           );
         }
         return null;
       },
-
-      // Normalize margins to remove big empty gaps
       customStylesBuilder: (element) {
         switch (element.localName) {
           case 'p':
@@ -252,8 +303,6 @@ class _ArticleHtml extends StatelessWidget {
         }
         return null;
       },
-
-      // Make links open externally
       onTapUrl: (url) async {
         final uri = Uri.tryParse(url);
         if (uri != null) {
@@ -266,11 +315,9 @@ class _ArticleHtml extends StatelessWidget {
   }
 }
 
-//
-// Factory: handles <img>, <video>, SVGs (no WebView mixin)
-//
 class _WPHtmlFactory extends WidgetFactory
     with
-        CachedNetworkImageFactory, // <img> with caching
-        fwfh_chewie.ChewieFactory, // <video> with Chewie/VideoPlayer
-        SvgFactory {} // inline SVGs
+        CachedNetworkImageFactory,
+        fwfh_chewie.ChewieFactory,
+        SvgFactory {}
+

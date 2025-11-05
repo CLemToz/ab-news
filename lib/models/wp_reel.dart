@@ -6,7 +6,9 @@ class WPReel {
   final String excerptRendered;
   final DateTime dateGmt;
   final String link;
-  final String? coverImage; // featured media (sized) or null
+
+  // We keep this mutable so API can fill it after a /media/{id} lookup.
+  String? coverImage;
 
   // Meta
   final String videoUrl;   // mp4 (preferred if set)
@@ -14,6 +16,9 @@ class WPReel {
   final int duration;      // seconds
   final int views;
   final int likes;
+
+  // Store the raw media id so we can resolve image later if not embedded
+  final int? featuredMediaId;
 
   WPReel({
     required this.id,
@@ -27,6 +32,7 @@ class WPReel {
     required this.duration,
     required this.views,
     required this.likes,
+    required this.featuredMediaId,
   });
 
   String get title   => _decodeHtml(_stripHtml(titleRendered));
@@ -44,6 +50,8 @@ class WPReel {
 
   static WPReel fromJson(Map<String, dynamic> j) {
     String? cover;
+
+    // Try _embedded['wp:featuredmedia'][0].media_details.sizes[…].source_url
     try {
       final media = j['_embedded']?['wp:featuredmedia'];
       if (media is List && media.isNotEmpty) {
@@ -52,7 +60,7 @@ class WPReel {
         if (md is Map) {
           final sizes = md['sizes'];
           if (sizes is Map) {
-            for (final key in ['medium_large','large','medium','full']) {
+            for (final key in ['medium_large', 'large', 'medium', 'full']) {
               final entry = sizes[key];
               if (entry is Map && entry['source_url'] != null) {
                 cover = entry['source_url'].toString();
@@ -78,6 +86,15 @@ class WPReel {
       return int.tryParse('$v') ?? 0;
     }
 
+    // Raw featured_media id (so we can fetch via /media/{id} when needed)
+    int? _fid;
+    final rawF = j['featured_media'];
+    if (rawF is int) {
+      _fid = rawF;
+    } else if (rawF != null) {
+      _fid = int.tryParse('$rawF');
+    }
+
     return WPReel(
       id: j['id'] ?? 0,
       titleRendered: (j['title']?['rendered'] ?? '').toString(),
@@ -90,6 +107,7 @@ class WPReel {
       duration: _i('duration'),
       views: _i('views'),
       likes: _i('likes'),
+      featuredMediaId: _fid,
     );
   }
 

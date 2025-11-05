@@ -14,12 +14,12 @@ class WpReelsApi {
       'per_page': '$perPage',
       'page': '$page',
       '_embed': '1',
-      // We request meta via custom REST field + featured image + basics
-      '_fields':
-      'id,date_gmt,link,title,excerpt,_embedded,meta',
+      // Ask for embedded block AND the raw featured_media id
+      '_fields': 'id,date_gmt,link,title,excerpt,_embedded,meta,featured_media',
     };
+    // If you ever filter by taxonomy, adjust the key here to your taxonomy.
     if (categoryId != null && categoryId > 0) {
-      qp['app_reel_cat'] = '$categoryId';
+      qp['reel_category'] = '$categoryId'; // <- keep your previous key if needed
     }
     return Uri.parse(base).replace(queryParameters: qp);
   }
@@ -32,16 +32,49 @@ class WpReelsApi {
     if (WPConfig.baseUrl.isEmpty) {
       throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
     }
-    final res = await http.get(_reelsUri(categoryId: categoryId, page: page, perPage: perPage));
+
+    final res = await http.get(
+      _reelsUri(categoryId: categoryId, page: page, perPage: perPage),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${res.reasonPhrase}');
     }
+
     final List data = jsonDecode(res.body);
-    return data.map<WPReel>((j) => WPReel.fromJson(j as Map<String, dynamic>)).toList();
+    final reels = data
+        .map<WPReel>((j) => WPReel.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    // Ensure featured image exists; if missing, fetch via /media/{id}
+    await Future.wait(reels.map((r) async {
+      if ((r.coverImage == null || r.coverImage!.isEmpty) &&
+          r.featuredMediaId != null &&
+          r.featuredMediaId! > 0) {
+        final url = await _fetchMediaUrl(r.featuredMediaId!);
+        if (url != null && url.isNotEmpty) {
+          r.coverImage = url; // fill in
+        }
+      }
+    }));
+
+    return reels;
   }
 
   static Future<List<WPReel>> fetchRecent({int perPage = 20, int page = 1}) =>
       fetchReels(perPage: perPage, page: page);
+
+  // --- Helpers --------------------------------------------------------------
+
+  static Future<String?> _fetchMediaUrl(int mediaId) async {
+    final uri = Uri.parse(
+      '${WPConfig.baseUrl}/wp-json/wp/v2/media/$mediaId?_fields=source_url',
+    );
+    final r = await http.get(uri);
+    if (r.statusCode != 200) return null;
+    final m = jsonDecode(r.body) as Map<String, dynamic>;
+    final url = (m['source_url'] ?? '').toString();
+    return url.isEmpty ? null : url;
+  }
 
   // Counters (plugin endpoints)
   static Future<int> incrementView(int id) async {

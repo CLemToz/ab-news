@@ -11,7 +11,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class ReelsScreen extends StatefulWidget {
   final int initialIndex;
-  const ReelsScreen({super.key, this.initialIndex = 0});
+  final int? initialReelId; // ⬅ NEW
+
+  const ReelsScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.initialReelId,
+  });
 
   @override
   State<ReelsScreen> createState() => _ReelsScreenState();
@@ -58,17 +64,32 @@ class _ReelsScreenState extends State<ReelsScreen> {
       final fresh = await WpReelsApi.fetchRecent(perPage: 10);
       if (!mounted) return;
       fresh.shuffle(_rng);
-      _items
-        ..clear()
-        ..addAll(fresh);
+      _items..clear()..addAll(fresh);
       setState(() => _loading = false);
-      _ensureController(_current);
-      _ensureController(_current + 1);
-      _playOnly(_current);
-      if (_items.isNotEmpty) {
-        // fire-and-forget
-        WpReelsApi.incrementView(_items[_current].id);
+
+// ensure controllers
+      await _ensureController(_current);
+      await _ensureController(_current + 1);
+
+// If a specific reel id was requested, jump to it
+      if (widget.initialReelId != null) {
+        final idx = _items.indexWhere((r) => r.id == widget.initialReelId);
+        if (idx >= 0) {
+          _current = idx;
+          _page.jumpToPage(idx);
+          await _ensureController(idx);
+          _playOnly(idx);
+        } else {
+          _playOnly(_current);
+        }
+      } else {
+        _playOnly(_current);
       }
+
+      if (_items.isNotEmpty) {
+        unawaited(WpReelsApi.incrementView(_items[_current].id));
+      }
+
     } catch (_) {
       if (!mounted) return;
       setState(() {

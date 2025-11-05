@@ -15,6 +15,10 @@ import '../../widgets/news_shimmers.dart';
 import '../../widgets/portrait_video_thumb.dart';
 import '../../widgets/recent_news_item.dart';
 import '../saved/saved_news_screen.dart';
+import '../../services/wp_reels_api.dart';
+import '../../models/wp_reel.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 
 
 // WP API + models
@@ -271,25 +275,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // -------- Helper Functions --------
   Widget _buildVideoSection() {
-    if (_hasError) return _buildErrorState();
-    if (_isLoadingVideos) return const VideoSectionShimmer();
-    if (reels.isEmpty) return const EmptyVideosState();
+    return FutureBuilder<List<WPReel>>(
+      future: WpReelsApi.fetchRecent(perPage: 5),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const VideoSectionShimmer();
+        }
+        if (snap.hasError) return _buildErrorState();
 
-    return SizedBox(
-      height: 220,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: reels.length.clamp(0, 10),
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => PortraitVideoThumb(
-          imageUrl: reels[i].coverImage,
-          title: reels[i].title,
-          onTap: () => _openReel(context, i),
-        ),
-      ),
+        final reels = snap.data ?? const <WPReel>[];
+        if (reels.isEmpty) return const EmptyVideosState();
+
+        return SizedBox(
+          height: 220,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: reels.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              final r = reels[i];
+
+              // ✅ Only use the field that exists in WPReel
+              final cover = (r.coverImage?.isNotEmpty ?? false)
+                  ? r.coverImage!
+                  : 'https://via.placeholder.com/720x1280?text=Reel';
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ReelsScreen(initialReelId: r.id),
+                    ),
+                  );
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
+                    children: [
+                      SizedBox(
+                        width: 150,
+                        height: 220,
+                        child: CachedNetworkImage(
+                          imageUrl: cover,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) =>
+                              Container(color: Theme.of(context).colorScheme.surfaceVariant),
+                          errorWidget: (_, __, ___) =>
+                              Container(color: Theme.of(context).colorScheme.surfaceVariant),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [Colors.black.withOpacity(.55), Colors.transparent],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                        child: Text(
+                          r.titleRendered ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
+
+
 
   Widget _buildErrorState() {
     return Container(
