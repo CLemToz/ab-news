@@ -18,6 +18,7 @@ import '../saved/saved_news_screen.dart';
 import '../../services/wp_reels_api.dart';
 import '../../models/wp_reel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/wp_categories_horizontal.dart';
 
 
 
@@ -193,29 +194,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SliverToBoxAdapter(child: _buildVideoSection()),
 
-          // -------- HIGHLIGHTED CATEGORIES (mock) --------
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
           SliverToBoxAdapter(
             child: SectionHeader(
               label: 'HIGHLIGHTED CATEGORIES',
               color: Brand.red,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               onViewAll: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const CategoriesScreen())),
-            ),
-          ),
-          if (_isLoadingAll)
-            const SliverToBoxAdapter(child: CategoriesRailShimmer())
-          else
-            SliverToBoxAdapter(
-              child: HorizontalCategoryList(
-                items: highlightedCategories,
-                onTap: (c) => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => CategoryNewsScreen(category: c.name)),
-                ),
+                context,
+                MaterialPageRoute(builder: (_) => const CategoriesScreen()),
               ),
             ),
+          ),
+          const SliverToBoxAdapter(
+            child: WpCategoriesHorizontal(
+              highlightedOnly: true, // 🔴 now driven by website toggle
+              maxItems: 12,
+            ),
+          ),
+
 
           // -------- RECENT NEWS (API: 10 newest) --------
           const SliverToBoxAdapter(child: SizedBox(height: 18)),

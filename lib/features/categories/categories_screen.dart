@@ -185,7 +185,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             'Categories',
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 18,
+              fontSize: 20,
             ),
           ),
         ),
