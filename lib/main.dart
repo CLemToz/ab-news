@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // keep if other parts use it; safe to keep
+import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
+
 import 'features/categories/categories_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reels/reels_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
+
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 
+// ⬇️ new: global app settings (font size + theme persistence)
+import 'services/app_settings.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // keep your provider boot; harmless even if theme comes from AppSettings
   final themeProvider = await ThemeProvider.create();
+
+  // load saved font scale + theme mode
+  await AppSettings.I.load();
+
   runApp(NewsApp(themeProvider: themeProvider));
 }
 
@@ -20,14 +31,33 @@ class NewsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeProvider,
-      builder: (context, themeMode, _) {
+    // Rebuild MaterialApp whenever user changes font size or theme in Settings
+    return AnimatedBuilder(
+      animation: AppSettings.I,
+      builder: (context, _) {
         return MaterialApp(
           title: 'DA News Plus',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: themeMode,
+
+          // ⬇️ Use the theme selected in Settings (System/Light/Dark)
+          // If you prefer your ThemeProvider sometimes, you can merge:
+          // themeMode: AppSettings.I.themeMode == ThemeMode.system
+          //     ? themeProvider.value
+          //     : AppSettings.I.themeMode,
+          themeMode: AppSettings.I.themeMode,
+
+          // ⬇️ Apply global text scale from Settings (0.85–1.40)
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaler: TextScaler.linear(AppSettings.I.fontScale),
+              ),
+              child: child!,
+            );
+          },
+
           home: Shell(themeProvider: themeProvider),
           debugShowCheckedModeBanner: false,
         );
@@ -47,12 +77,13 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int index = 0;
 
-  late final _pages = [
+  late final _pages = <Widget>[
     const HomeScreen(),
     const CategoriesScreen(),
     const ReelsScreen(),
     const SearchScreen(),
-    SettingsScreen(themeProvider: widget.themeProvider),
+    // ⬇️ SettingsScreen no longer needs ThemeProvider
+    const SettingsScreen(),
   ];
 
   @override

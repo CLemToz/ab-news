@@ -86,6 +86,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/faviconsize.jpg
+    - assets/brands/airtel_xstream.png
+    - assets/brands/jiotv.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
