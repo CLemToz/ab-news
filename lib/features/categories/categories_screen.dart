@@ -174,8 +174,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: cs.secondary,
-        foregroundColor: cs.onSecondary,
+        // backgroundColor: cs.secondary,
+        // foregroundColor: cs.onSecondary,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         centerTitle: false,
         titleSpacing: 0,
