@@ -1,12 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
-
 import 'features/categories/categories_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reels/reels_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
 
+import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 
@@ -15,6 +16,9 @@ import 'services/app_settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // keep your provider boot; harmless even if theme comes from AppSettings
   final themeProvider = await ThemeProvider.create();

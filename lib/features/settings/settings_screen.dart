@@ -1,8 +1,11 @@
+import 'package:ab_news/features/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../theme/brand.dart';
 import '../../services/app_settings.dart';
+import '../../services/auth_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -58,18 +61,38 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
-class _LoginCard extends StatelessWidget {
+class _LoginCard extends StatefulWidget {
   final Color accentRed;
   final Color accentBlue;
   const _LoginCard({required this.accentRed, required this.accentBlue});
 
   @override
+  State<_LoginCard> createState() => _LoginCardState();
+}
+
+class _LoginCardState extends State<_LoginCard> {
+  final _authService = AuthService();
+  User? _user = FirebaseAuth.instance.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      setState(() {
+        _user = user;
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final user = _user;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accentRed.withOpacity(.95), accentBlue.withOpacity(.95)],
+          colors: [widget.accentRed.withOpacity(.95), widget.accentBlue.withOpacity(.95)],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
@@ -90,23 +113,41 @@ class _LoginCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Log in to sync your saved news & preferences across devices.',
+              user != null
+                  ? 'Logged in as ${user.displayName}'
+                  : 'Log in to sync your saved news & preferences across devices.',
               style:
               const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: 12),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: cs.primary,
-              shape: const StadiumBorder(),
+          if (user != null)
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: cs.primary,
+                shape: const StadiumBorder(),
+              ),
+              onPressed: () async {
+                await _authService.signOut();
+              },
+              child: const Text('Log out'),
+            )
+          else
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: cs.primary,
+                shape: const StadiumBorder(),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const LoginScreen(),
+                );
+              },
+              child: const Text('Log in'),
             ),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login coming soon')),
-            ),
-            child: const Text('Log in'),
-          ),
         ],
       ),
     );
