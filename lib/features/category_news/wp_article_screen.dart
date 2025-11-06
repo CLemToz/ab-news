@@ -64,9 +64,6 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
     await _safeLaunch(xUrl, mode: LaunchMode.externalApplication);
   }
 
-
-
-
   // --- Facebook ---
   Future<void> _shareOnFacebook() async {
     final url = Uri.encodeComponent(widget.post.url);
@@ -95,7 +92,7 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
         ),
         actions: [
           FutureBuilder<bool>(
-            future: SaveManager.isSaved(widget.post.id),
+            future: SaveManager.isSaved(widget.post.id ?? -1), // ✅ null-safe
             builder: (context, snapshot) {
               final isSaved = snapshot.data ?? false;
               return IconButton(
@@ -110,7 +107,9 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
                   } else {
                     await SaveManager.save(widget.post);
                   }
-                  setState(() {});
+                  if (mounted) {
+                    setState(() {});
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(isSaved
@@ -320,4 +319,3 @@ class _WPHtmlFactory extends WidgetFactory
         CachedNetworkImageFactory,
         fwfh_chewie.ChewieFactory,
         SvgFactory {}
-

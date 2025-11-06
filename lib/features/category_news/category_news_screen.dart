@@ -103,11 +103,22 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
         _page += 1;
       });
     } catch (_) {
-      setState(() {
-        if (_page == 1) _loading = false;
-        _loadingMore = false;
-        _error = true;
-      });
+      final isFirstPage = (initial || _page == 1);
+      if (isFirstPage) {
+        setState(() {
+          _loading = false;
+          _error = true;      // full-screen error only on page 1
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _loadingMore = false; // stop spinner
+          _hasMore = false;     // stop further pagination
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn’t load more news.")),
+        );
+      }
     }
   }
 
@@ -185,33 +196,83 @@ class _CategoryNewsScreenState extends State<CategoryNewsScreen> {
                   ),
                 ),
               )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.only(bottom: 12),
-                sliver: SliverList.separated(
-                  itemCount: _posts.length + (_loadingMore ? 1 : 0),
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (context, i) {
-                    if (i >= _posts.length) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    final p = _posts[i];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: RecentNewsItem(
-                        article: p,
-                        displayCategory: _resolveCategoryName(p),
-                        onTap: () => _openArticle(p),
+            // ✅ Empty-state when there are no posts in this category
+            else if (_posts.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: cs.outlineVariant),
                       ),
-                    );
-                  },
-                ),
-              ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.article_outlined, size: 54, color: cs.onSurfaceVariant),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No news in this category yet',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Pull to refresh or try again later.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton.tonal(
+                            onPressed: () => _fetch(refresh: true),
+                            child: const Text('Refresh'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  sliver: SliverList.separated(
+                    itemCount: _posts.length + (_loadingMore ? 1 : (!_hasMore ? 1 : 0)),
+                    separatorBuilder: (_, __) => const SizedBox(height: 6),
+                    itemBuilder: (context, i) {
+                      // trailing loader while fetching next page
+                      if (i >= _posts.length && _loadingMore) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      // trailing “no more news” footer (after empty page or load-more error)
+                      if (i >= _posts.length && !_hasMore) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          child: _EndOfList(),
+                        );
+                      }
 
-            // ✅ Add bottom padding spacer here
+                      final p = _posts[i];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: RecentNewsItem(
+                          article: p,
+                          displayCategory: _resolveCategoryName(p),
+                          onTap: () => _openArticle(p),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+            // ✅ Bottom spacer
             const SliverToBoxAdapter(
               child: SizedBox(height: 100),
             ),
@@ -300,4 +361,22 @@ class _CategoryNameCache {
   static final Map<int, String> _map = {};
   static void set(int id, String name) => _map[id] = name;
   static String? get(int id) => _map[id];
+}
+
+class _EndOfList extends StatelessWidget {
+  const _EndOfList();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Text(
+        'No more news',
+        style: TextStyle(
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 }

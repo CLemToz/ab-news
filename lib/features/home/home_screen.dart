@@ -416,7 +416,10 @@ class TrendingNewsCard extends StatelessWidget {
             color: Brand.red.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(FontAwesomeIcons.fireFlameCurved, color: Colors.redAccent),
+          child: const Icon(
+            FontAwesomeIcons.fireFlameCurved,
+            color: Colors.redAccent,
+          ),
         ),
         title: const Text(
           'Trending News',
@@ -437,7 +440,16 @@ class TrendingNewsCard extends StatelessWidget {
             ),
           ),
           onPressed: () {
-            // TODO: Navigate to trending page
+            // ✅ Navigate to “ट्रेंडिंग News” category
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CategoryNewsScreen(
+                  category: 'Trending News',
+                  categoryId: 63554,
+                ),
+              ),
+            );
           },
           child: const Text(
             'See',
@@ -448,6 +460,7 @@ class TrendingNewsCard extends StatelessWidget {
     );
   }
 }
+
 
 /// -------------------------------
 /// View All screen for Recent News
