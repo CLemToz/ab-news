@@ -5,7 +5,7 @@ class WPPost {
   final String titleRendered;
   final String excerptRendered; // HTML
   final String contentRendered; // HTML
-  final DateTime dateGmt;
+  final DateTime date; // Use the site's local time from the 'date' field.
   final String link;
   final String? featuredImage;
   final List<String> categoriesNames;
@@ -17,7 +17,7 @@ class WPPost {
     required this.titleRendered,
     required this.excerptRendered,
     required this.contentRendered,
-    required this.dateGmt,
+    required this.date, // Changed from dateGmt
     required this.link,
     required this.featuredImage,
     required this.categoriesNames,
@@ -30,30 +30,21 @@ class WPPost {
         (o != null && o[k] is String) ? (o[k] as String) : '';
 
     DateTime _parseDate() {
-      final dateGmtStr = j['date_gmt']?.toString();
-      if (dateGmtStr != null && dateGmtStr.isNotEmpty) {
-        try {
-          // CRITICAL FIX: The `date_gmt` string from WordPress is UTC,
-          // but it often lacks the 'Z' suffix. `DateTime.parse` will incorrectly
-          // treat it as a local time without this. Appending 'Z' ensures
-          // it is correctly parsed as UTC.
-          if (dateGmtStr.endsWith('Z')) {
-            return DateTime.parse(dateGmtStr);
-          } else {
-            return DateTime.parse('${dateGmtStr}Z');
-          }
-        } catch (_) {}
-      }
-      
-      // Fallback to the local `date` field if `date_gmt` is missing.
+      // Prioritize the `date` field as requested.
       final dateStr = j['date']?.toString();
       if (dateStr != null && dateStr.isNotEmpty) {
         try {
-          return DateTime.parse(dateStr).toUtc();
+          return DateTime.parse(dateStr);
         } catch (_) {}
       }
-      
-      return DateTime.now().toUtc();
+      // Fallback to `date_gmt` if `date` is not available.
+      final dateGmtStr = j['date_gmt']?.toString();
+      if (dateGmtStr != null && dateGmtStr.isNotEmpty) {
+        try {
+          return DateTime.parse('${dateGmtStr}Z').toLocal();
+        } catch (_) {}
+      }
+      return DateTime.now();
     }
 
     String? _featuredFromEmbed() {
@@ -63,8 +54,9 @@ class WPPost {
             emb['wp:featuredmedia'] is List &&
             emb['wp:featuredmedia'].isNotEmpty) {
           final m = emb['wp:featuredmedia'][0];
-          if (m is Map && m['source_url'] is String) {
-            return m['source_url'] as String;
+          final srcUrl = m['source_url'];
+          if (srcUrl is String && srcUrl.isNotEmpty) {
+            return srcUrl;
           }
         }
       } catch (_) {}
@@ -83,7 +75,8 @@ class WPPost {
           final terms = emb['wp:term'] as List;
           for (final tax in terms) {
             if (tax is List && tax.isNotEmpty) {
-              if ((tax.first as Map?)?['taxonomy'] == 'category') {
+              final firstTerm = tax.first;
+              if (firstTerm is Map && firstTerm['taxonomy'] == 'category') {
                 return tax
                     .whereType<Map>()
                     .map((m) => (m['name'] ?? '').toString())
@@ -102,7 +95,7 @@ class WPPost {
       titleRendered: _rendered(j['title'], 'rendered'),
       excerptRendered: _rendered(j['excerpt'], 'rendered'),
       contentRendered: _rendered(j['content'], 'rendered'),
-      dateGmt: _parseDate(), // <-- USE THE CORRECTED PARSER
+      date: _parseDate(), // Correctly assign to `date`
       link: (j['link'] ?? '').toString(),
       featuredImage: _featuredFromEmbed(),
       categoriesNames: _categoryNamesFromEmbed(),
@@ -113,29 +106,24 @@ class WPPost {
   static List<WPPost> listFromWpV2(List<dynamic> arr) =>
       arr.whereType<Map<String, dynamic>>().map(WPPost.fromWpV2).toList();
 
-  String get title   => _decodeHtml(_stripHtml(titleRendered));
+  String get title => _decodeHtml(_stripHtml(titleRendered));
   String get summary => _decodeHtml(_stripHtml(excerptRendered));
-  String get body    => _decodeHtml(_stripHtml(contentRendered));
-
+  String get body => _decodeHtml(_stripHtml(contentRendered));
   String get imageUrl => featuredImage ?? '';
   String get url => link;
-
   String get category =>
       categoriesNames.isNotEmpty ? categoriesNames.first : 'News';
-
   bool get isVideo => false;
   String get videoDuration => '';
 
   String get timeAgo {
-    final diff = DateTime.now().toUtc().difference(dateGmt);
-    
+    // Perform the difference calculation in local time.
+    final diff = DateTime.now().difference(date);
     if (diff.isNegative) return 'Just now';
-
     if (diff.inSeconds < 60) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-    if (diff.inHours   < 24) return '${diff.inHours} hours ago';
-    
-    return DateFormat('d MMM, yyyy • h:mm a').format(dateGmt.toLocal());
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return DateFormat('d MMM, yyyy • h:mm a').format(date);
   }
 
   static String _stripHtml(String html) =>
@@ -165,7 +153,7 @@ class WPPost {
       titleRendered: json['titleRendered'] ?? '',
       excerptRendered: json['excerptRendered'] ?? '',
       contentRendered: json['contentRendered'] ?? '',
-      dateGmt: DateTime.tryParse(json['dateGmt'] ?? '') ?? DateTime.now(),
+      date: DateTime.tryParse(json['date'] ?? '') ?? DateTime.now(),
       link: json['link'] ?? '',
       featuredImage: json['featuredImage'],
       categoriesNames: (json['categoriesNames'] as List?)?.cast<String>() ?? [],
@@ -179,12 +167,11 @@ class WPPost {
     'titleRendered': titleRendered,
     'excerptRendered': excerptRendered,
     'contentRendered': contentRendered,
-    'dateGmt': dateGmt.toIso8601String(),
+    'date': date.toIso8601String(),
     'link': link,
     'featuredImage': featuredImage,
     'categoriesNames': categoriesNames,
     'categoriesIds': categoriesIds,
     'isRead': isRead,
   };
-
 }

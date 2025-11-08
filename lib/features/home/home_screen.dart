@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final posts = await WpApi.fetchPosts(perPage: 20);
       if (mounted) {
         final newPosts = posts
-            .where((p) => p.dateGmt.toUtc().isAfter(lastReadTime))
+            .where((p) => p.date.isAfter(lastReadTime))
             .toList();
         setState(() {
           _unreadPosts = newPosts;
@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // After returning, update the time and clear the unread count.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lastReadTime', DateTime.now().toUtc().toIso8601String());
+    await prefs.setString('lastReadTime', DateTime.now().toIso8601String());
 
     if (mounted) {
       setState(() {
