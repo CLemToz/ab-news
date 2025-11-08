@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
@@ -36,36 +37,41 @@ class NewsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Rebuild MaterialApp whenever user changes font size or theme in Settings
-    return AnimatedBuilder(
-      animation: AppSettings.I,
-      builder: (context, _) {
-        return MaterialApp(
-          title: 'DA News Plus',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        return AnimatedBuilder(
+          animation: AppSettings.I,
+          builder: (context, _) {
+            return MaterialApp(
+              title: 'DA News Plus',
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
 
-          // ⬇️ Use the theme selected in Settings (System/Light/Dark)
-          // If you prefer your ThemeProvider sometimes, you can merge:
-          // themeMode: AppSettings.I.themeMode == ThemeMode.system
-          //     ? themeProvider.value
-          //     : AppSettings.I.themeMode,
-          themeMode: AppSettings.I.themeMode,
+              // ⬇️ Use the theme selected in Settings (System/Light/Dark)
+              // If you prefer your ThemeProvider sometimes, you can merge:
+              // themeMode: AppSettings.I.themeMode == ThemeMode.system
+              //     ? themeProvider.value
+              //     : AppSettings.I.themeMode,
+              themeMode: AppSettings.I.themeMode,
 
-          // ⬇️ Apply global text scale from Settings (0.85–1.40)
-          builder: (context, child) {
-            final mq = MediaQuery.of(context);
-            return MediaQuery(
-              data: mq.copyWith(
-                textScaler: TextScaler.linear(AppSettings.I.fontScale),
-              ),
-              child: child!,
+              // ⬇️ Apply global text scale from Settings (0.85–1.40)
+              builder: (context, child) {
+                final mq = MediaQuery.of(context);
+                return MediaQuery(
+                  data: mq.copyWith(
+                    textScaler: TextScaler.linear(AppSettings.I.fontScale),
+                  ),
+                  child: child!,
+                );
+              },
+
+              home: Shell(themeProvider: themeProvider),
+              debugShowCheckedModeBanner: false,
             );
           },
-
-          home: Shell(themeProvider: themeProvider),
-          debugShowCheckedModeBanner: false,
         );
-      },
+      }
     );
   }
 }
