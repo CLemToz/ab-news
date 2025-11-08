@@ -1,8 +1,6 @@
-import 'dart:ui';
-import 'package:ab_news/services/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,183 +10,111 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _nameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
+  String? _errorMessage;
   bool _isLoading = false;
 
-  Future<void> _signupUser() async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential = await _authService.createUserWithEmailAndPassword(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
-
-      if (!mounted) return;
-
-      if (userCredential != null) {
-        Navigator.of(context).pop();
-      }
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        _showPasswordResetDialog();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message ?? 'Signup failed. Please try again.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+  Future<void> _signupWithEmailPassword() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+      try {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          // Pop the signup screen to return to the previous screen (likely home/shell)
+          Navigator.of(context).pop();
+        }
+      } on FirebaseAuthException catch (e) {
+        setState(() {
+          if (e.code == 'weak-password') {
+            _errorMessage = 'The password provided is too weak.';
+          } else if (e.code == 'email-already-in-use') {
+            _errorMessage = 'The account already exists for that email.';
+          } else {
+            _errorMessage = 'An error occurred. Please try again.';
+          }
+        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
 
-  void _showPasswordResetDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Account already exists'),
-        content: const Text(
-            'An account with this email already exists. Would you like to reset your password?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await _authService
-                  .sendPasswordResetEmail(_emailController.text.trim());
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Password reset email sent.'),
-                ),
-              );
-            },
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
-    final userCredential = await _authService.signInWithGoogle();
-
-    if (!mounted) return;
-
-    if (userCredential != null) {
-      Navigator.of(context).pop();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Google sign-in failed.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
-    setState(() => _isLoading = false);
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.5),
-      body: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Container(
-              margin: const EdgeInsets.all(24.0),
-              padding: const EdgeInsets.all(24.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(16.0),
+      appBar: AppBar(
+        title: const Text('Sign Up'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.isEmpty || !value.contains('@')) {
+                    return 'Please enter a valid email';
+                  }
+                  return null;
+                },
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Sign Up',
-                      style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_isLoading)
-                    const CircularProgressIndicator()
-                  else
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                      ),
-                      onPressed: _signupUser,
-                      child: const Text('Sign up'),
-                    ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                    ),
-                    onPressed: _signInWithGoogle,
-                    icon: const FaIcon(FontAwesomeIcons.google, size: 18),
-                    label: const Text('Sign in with Google'),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("Already have an account?"),
-                      TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : () {
-                                Navigator.of(context).pop();
-                              },
-                        child: const Text('Login'),
-                      ),
-                    ],
-                  ),
-                ],
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Password'),
+                validator: (value) {
+                  if (value == null || value.isEmpty || value.length < 6) {
+                    return 'Password must be at least 6 characters';
+                  }
+                  return null;
+                },
               ),
-            ),
+              const SizedBox(height: 24),
+              if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      onPressed: _signupWithEmailPassword,
+                      child: const Text('Sign Up'),
+                    ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Already have an account? Login'),
+              )
+            ],
           ),
         ),
       ),

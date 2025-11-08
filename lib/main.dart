@@ -1,7 +1,9 @@
+import 'package:ab_news/widgets/login_popup.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
+import 'package:shared_preferences/shared_preferences.dart';
 import 'features/categories/categories_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reels/reels_screen.dart';
@@ -95,6 +97,28 @@ class _ShellState extends State<Shell> {
     // ⬇️ SettingsScreen no longer needs ThemeProvider
     const SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool loginSkipped = prefs.getBool('loginSkipped') ?? false;
+
+    if (!loginSkipped) {
+      // It's the first launch, show the login popup.
+      Future.microtask(() => showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const LoginPopup();
+        },
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // ✅ added for icons
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../theme/brand.dart'; // Brand.red
+import '../../theme/brand.dart';
 import '../../data/mock_data.dart';
 import '../../widgets/common.dart';
 import '../../widgets/news_cards.dart';
@@ -11,8 +13,6 @@ import '../categories/categories_screen.dart';
 import '../reels/reels_screen.dart';
 import '../../widgets/video_section_shimmer.dart';
 import '../../widgets/empty_videos_state.dart';
-import '../../widgets/news_shimmers.dart';
-import '../../widgets/portrait_video_thumb.dart';
 import '../../widgets/recent_news_item.dart';
 import '../saved/saved_news_screen.dart';
 import '../../services/wp_reels_api.dart';
@@ -20,14 +20,10 @@ import '../../models/wp_reel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../widgets/wp_categories_horizontal.dart';
 
-
-
-// WP API + models
 import '../../services/wp_api.dart';
 import '../../models/wp_post.dart';
 import '../category_news/wp_article_screen.dart';
 
-// Rounded, auto-playing slider fed by WP
 import '../../widgets/breaking_news_section.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -38,358 +34,361 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isLoadingVideos = false;
-  bool _hasError = false;
-  bool _isLoadingAll = false;
+  int _unreadCount = 0;
+  List<WPPost> _unreadPosts = [];
 
-  // Your Breaking category ID
   static const int _breakingCategoryId = 398;
 
-  Future<void> _refreshAll() async {
-    setState(() {
-      _isLoadingVideos = true;
-      _isLoadingAll = true;
-      _hasError = false;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _checkForNewPosts();
+    // Check for new posts periodically.
+    Timer.periodic(const Duration(minutes: 2), (_) => _checkForNewPosts());
+  }
 
+  /// Checks for posts newer than the last time the user opened the unread screen.
+  Future<void> _checkForNewPosts() async {
     try {
-      await Future.delayed(const Duration(seconds: 2));
-    } finally {
+      final prefs = await SharedPreferences.getInstance();
+      final lastReadTimeStr = prefs.getString('lastReadTime');
+      final lastReadTime = lastReadTimeStr != null
+          ? DateTime.parse(lastReadTimeStr)
+          : DateTime.fromMillisecondsSinceEpoch(0);
+
+      final posts = await WpApi.fetchPosts(perPage: 20);
       if (mounted) {
+        final newPosts = posts
+            .where((p) => p.dateGmt.toUtc().isAfter(lastReadTime))
+            .toList();
         setState(() {
-          _isLoadingVideos = false;
-          _isLoadingAll = false;
+          _unreadPosts = newPosts;
+          _unreadCount = newPosts.length;
         });
       }
+    } catch (e) {
+      // Silently ignore errors, as this runs in the background.
     }
   }
 
-  void _openReel(BuildContext context, int index) {
-    Navigator.push(
+  /// Navigates to the unread screen and, upon return, marks items as read.
+  void _showUnreadNews() async {
+    // Navigate and wait for the user to return.
+    await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ReelsScreen(initialIndex: index)),
+      MaterialPageRoute(
+        builder: (_) => _UnreadNewsScreen(posts: _unreadPosts),
+      ),
     );
-  }
 
-  // Smart open: WP posts -> WpArticleScreen, mock articles -> ArticleScreen
-  void _openArticle(BuildContext context, dynamic article) {
-    if (article is WPPost) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => WpArticleScreen(post: article)),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ArticleScreen(article: article)),
-      );
+    // After returning, update the time and clear the unread count.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastReadTime', DateTime.now().toUtc().toIso8601String());
+
+    if (mounted) {
+      setState(() {
+        _unreadCount = 0;
+        _unreadPosts = [];
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return RefreshIndicator(
-      onRefresh: _refreshAll,
+      onRefresh: _checkForNewPosts,
       child: CustomScrollView(
         slivers: [
-          // -------- Header --------
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // ✅ Left side: logo + name
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/faviconsize.jpg', // ✅ your DA News logo
-                        height: 40,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'DA News Plus',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // ✅ Right side: Notification + Saved icons
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(FontAwesomeIcons.bell),
-                        onPressed: () {
-                          // TODO: Add Notification screen navigation
-                        },
-                        color: Brand.red,
-                      ),
-                      IconButton(
-                        icon: const Icon(FontAwesomeIcons.bookmark),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SavedNewsScreen()),
-                          );
-                        },
-                        color: Brand.red,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
+          _buildHeader(context),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
           const SliverToBoxAdapter(child: TickerStrip(text: tickerText)),
           const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-          // ✅ Replaced QuickReadCard → TrendingNewsCard
           const SliverToBoxAdapter(child: TrendingNewsCard()),
           const SliverToBoxAdapter(child: SizedBox(height: 2)),
-
-          // -------- BREAKING NEWS (API slider) --------
-          SliverToBoxAdapter(
-            child: SectionHeader(
-              label: 'BREAKING NEWS',
-              color: Brand.red,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              onViewAll: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CategoryNewsScreen(
-                    category: 'Breaking News',
-                    categoryId: _breakingCategoryId,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _buildSectionHeader(context, 'BREAKING NEWS', _breakingCategoryId),
           SliverToBoxAdapter(
             child: BreakingNewsSection(
               categoryId: _breakingCategoryId,
               perPage: 5,
             ),
           ),
-
-          // -------- VIDEOS (mock) --------
           const SliverToBoxAdapter(child: SizedBox(height: 18)),
-          SliverToBoxAdapter(
-            child: SectionHeader(
-              label: 'VIDEOS',
-              color: Brand.red,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              onViewAll: () {
-                Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => const ReelsScreen()));
-              },
-            ),
-          ),
-          SliverToBoxAdapter(child: _buildVideoSection()),
-
+          _buildSectionHeader(context, 'VIDEOS', null, showReels: true),
+          _buildVideoSection(),
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          SliverToBoxAdapter(
-            child: SectionHeader(
-              label: 'HIGHLIGHTED CATEGORIES',
-              color: Brand.red,
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              onViewAll: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CategoriesScreen()),
-              ),
-            ),
-          ),
+          _buildSectionHeader(context, 'HIGHLIGHTED CATEGORIES', null, showCategories: true),
           const SliverToBoxAdapter(
-            child: WpCategoriesHorizontal(
-              highlightedOnly: true, // 🔴 now driven by website toggle
-              maxItems: 12,
-            ),
+            child: WpCategoriesHorizontal(highlightedOnly: true, maxItems: 12),
           ),
-
-
-          // -------- RECENT NEWS (API: 10 newest) --------
           const SliverToBoxAdapter(child: SizedBox(height: 18)),
-          SliverToBoxAdapter(
-            child: SectionHeader(
-              label: 'RECENT NEWS',
-              color: Brand.red,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              onViewAll: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const _RecentAllScreen()),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: FutureBuilder<List<WPPost>>(
-              future: WpApi.fetchRecent(perPage: 10),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: SizedBox(
-                      height: 180,
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  );
-                }
-                final list = snap.data ?? const <WPPost>[];
-                if (list.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Text('No recent news'),
-                  );
-                }
-                return Column(
-                  children: List.generate(list.length, (i) {
-                    final p = list[i];
-                    return Padding(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: RecentNewsItem(
-                        article: p,
-                        onTap: () => _openArticle(context, p),
-                        displayCategory: p.category, // chip shows post category
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 0)),
+          _buildSectionHeader(context, 'RECENT NEWS', null, showRecent: true),
+          _buildRecentNews(),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
       ),
     );
   }
 
-  // -------- Helper Functions --------
-  Widget _buildVideoSection() {
-    return FutureBuilder<List<WPReel>>(
-      future: WpReelsApi.fetchRecent(perPage: 5),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const VideoSectionShimmer();
-        }
-        if (snap.hasError) return _buildErrorState();
-
-        final reels = snap.data ?? const <WPReel>[];
-        if (reels.isEmpty) return const EmptyVideosState();
-
-        return SizedBox(
-          height: 220,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: reels.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (_, i) {
-              final r = reels[i];
-
-              // ✅ Only use the field that exists in WPReel
-              final cover = (r.coverImage?.isNotEmpty ?? false)
-                  ? r.coverImage!
-                  : 'https://via.placeholder.com/720x1280?text=Reel';
-
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ReelsScreen(initialReelId: r.id),
-                    ),
-                  );
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Stack(
+  SliverToBoxAdapter _buildHeader(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Image.asset('assets/faviconsize.jpg', height: 40),
+                const SizedBox(width: 8),
+                const Text(
+                  'DA News Plus',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                if (_unreadCount > 0)
+                  Stack(
+                    alignment: Alignment.topRight,
                     children: [
-                      SizedBox(
-                        width: 150,
-                        height: 220,
-                        child: CachedNetworkImage(
-                          imageUrl: cover,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: Theme.of(context).colorScheme.surfaceVariant),
-                          errorWidget: (_, __, ___) =>
-                              Container(color: Theme.of(context).colorScheme.surfaceVariant),
-                        ),
+                      IconButton(
+                        icon: const Icon(FontAwesomeIcons.bell, color: Brand.red),
+                        onPressed: _showUnreadNews, // <-- CORRECTED ACTION
                       ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [Colors.black.withOpacity(.55), Colors.transparent],
-                            ),
-                          ),
+                      Container(
+                        margin: const EdgeInsets.only(top: 8, right: 6),
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
                         ),
-                      ),
-                      Positioned(
-                        left: 10,
-                        right: 10,
-                        bottom: 10,
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                         child: Text(
-                          r.titleRendered ?? '',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          '$_unreadCount',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1.2,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ],
+                  )
+                else
+                  // Show a disabled (grey) bell when there are no new notifications.
+                  IconButton(
+                    icon: const Icon(FontAwesomeIcons.solidBell, color: Colors.grey),
+                    onPressed: () {},
                   ),
+                IconButton(
+                  icon: const Icon(FontAwesomeIcons.bookmark, color: Brand.red),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SavedNewsScreen()),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        );
-      },
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
+  // ... (other build methods remain the same) ...
 
-
-  Widget _buildErrorState() {
-    return Container(
-      height: 180,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
+  SliverToBoxAdapter _buildSectionHeader(BuildContext context, String label, int? categoryId, {bool showRecent = false, bool showCategories = false, bool showReels = false}) {
+    return SliverToBoxAdapter(
+      child: SectionHeader(
+        label: label,
+        color: Brand.red,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        onViewAll: () {
+          Widget screen = const SizedBox.shrink();
+          if (categoryId != null) {
+            screen = CategoryNewsScreen(category: label, categoryId: categoryId);
+          } else if (showRecent) {
+            screen = const _AllRecentNewsScreen(); // Dedicated screen for all recent news
+          } else if (showCategories) {
+            screen = const CategoriesScreen();
+          } else if (showReels) {
+            screen = const ReelsScreen();
+          }
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+        },
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline,
-              size: 48, color: Theme.of(context).colorScheme.error),
-          const SizedBox(height: 12),
-          Text('Failed to load videos',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          FilledButton.tonal(onPressed: _refreshAll, child: const Text('Try Again')),
-        ],
+    );
+  }
+
+  Widget _buildVideoSection() {
+    return SliverToBoxAdapter(
+      child: FutureBuilder<List<WPReel>>(
+        future: WpReelsApi.fetchRecent(perPage: 5),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) return const VideoSectionShimmer();
+          if (snap.hasError || !snap.hasData || snap.data!.isEmpty) return const EmptyVideosState();
+          final reels = snap.data!;
+          return SizedBox(
+            height: 220,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: reels.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) {
+                final r = reels[i];
+                return GestureDetector(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReelsScreen(initialReelId: r.id))),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack( // ... build reel item ...
+                      children: [
+                        SizedBox(
+                          width: 150,
+                          height: 220,
+                          child: CachedNetworkImage(imageUrl: r.coverImage ?? '', fit: BoxFit.cover),
+                        ),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [Colors.black.withOpacity(.55), Colors.transparent],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(left: 10, right: 10, bottom: 10, child: Text(r.titleRendered ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecentNews() {
+    return SliverToBoxAdapter(
+      child: FutureBuilder<List<WPPost>>(
+        future: WpApi.fetchRecent(perPage: 10),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+          if (snap.hasError || !snap.hasData || snap.data!.isEmpty) return const Center(child: Text('No recent news'));
+          final list = snap.data!;
+          return Column(
+            children: list.map((p) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: RecentNewsItem(
+                article: p,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WpArticleScreen(post: p))),
+                displayCategory: p.category,
+              ),
+            )).toList(),
+          );
+        },
       ),
     );
   }
 }
 
-/// -------------------------------
-/// Trending News Card (replacement)
-/// -------------------------------
+/// Screen to display a list of unread news articles.
+class _UnreadNewsScreen extends StatelessWidget {
+  final List<WPPost> posts;
+  const _UnreadNewsScreen({required this.posts});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Unread News'),
+        backgroundColor: Brand.red,
+        foregroundColor: Colors.white,
+      ),
+      body: posts.isEmpty
+          ? const Center(child: Text('No unread articles.'))
+          : ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              itemCount: posts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) {
+                final post = posts[i];
+                return RecentNewsItem(
+                  article: post,
+                  displayCategory: post.category,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => WpArticleScreen(post: post)),
+                    );
+                  },
+                );
+              },
+            ),
+    );
+  }
+}
+
+
+/// Screen to display all recent news (used for 'View All').
+class _AllRecentNewsScreen extends StatelessWidget {
+  const _AllRecentNewsScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Recent News'),
+        backgroundColor: Brand.red,
+        foregroundColor: Colors.white,
+      ),
+      body: FutureBuilder<List<WPPost>>(
+        future: WpApi.fetchRecent(perPage: 20),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snap.hasData || snap.data!.isEmpty) {
+            return const Center(child: Text('No recent news available.'));
+          }
+          final posts = snap.data!;
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            itemCount: posts.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, i) {
+              final post = posts[i];
+              return RecentNewsItem(
+                article: post,
+                displayCategory: post.category,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => WpArticleScreen(post: post)),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+
 class TrendingNewsCard extends StatelessWidget {
   const TrendingNewsCard({super.key});
 
@@ -400,119 +399,28 @@ class TrendingNewsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, offset: const Offset(0, 3))],
       ),
       child: ListTile(
         leading: Container(
-          height: 40,
-          width: 40,
-          decoration: BoxDecoration(
-            color: Brand.red.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            FontAwesomeIcons.fireFlameCurved,
-            color: Colors.redAccent,
-          ),
+          height: 40, width: 40,
+          decoration: BoxDecoration(color: Brand.red.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(FontAwesomeIcons.fireFlameCurved, color: Colors.redAccent),
         ),
-        title: const Text(
-          'Trending News',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
-        ),
-        subtitle: const Text(
-          'Stay updated with top trending stories.',
-          style: TextStyle(fontSize: 13, color: Colors.black54),
-        ),
+        title: const Text('Trending News', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        subtitle: const Text('Stay updated with top trending stories.', style: TextStyle(fontSize: 13, color: Colors.black54)),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Brand.red,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           onPressed: () {
-            // ✅ Navigate to “ट्रेंडिंग News” category
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const CategoryNewsScreen(
-                  category: 'Trending News',
-                  categoryId: 63554,
-                ),
-              ),
+              MaterialPageRoute(builder: (_) => const CategoryNewsScreen(category: 'Trending News', categoryId: 63554)),
             );
           },
-          child: const Text(
-            'See',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-/// -------------------------------
-/// View All screen for Recent News
-/// -------------------------------
-class _RecentAllScreen extends StatelessWidget {
-  const _RecentAllScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recent News'),
-        backgroundColor: Brand.red,
-        foregroundColor: Colors.white,
-      ),
-      body: RefreshIndicator(
-        color: Brand.red,
-        onRefresh: () async {},
-        child: FutureBuilder<List<WPPost>>(
-          future: WpApi.fetchRecent(perPage: 20),
-          builder: (context, snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final list = snap.data ?? const <WPPost>[];
-            if (list.isEmpty) {
-              return Center(
-                child: Text('No recent news',
-                    style: TextStyle(color: cs.onSurfaceVariant)),
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: list.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final p = list[i];
-                return RecentNewsItem(
-                  article: p,
-                  displayCategory: p.category,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => WpArticleScreen(post: p)),
-                    );
-                  },
-                );
-              },
-            );
-          },
+          child: const Text('See', style: TextStyle(color: Colors.white)),
         ),
       ),
     );

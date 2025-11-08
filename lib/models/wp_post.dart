@@ -10,6 +10,7 @@ class WPPost {
   final String? featuredImage;
   final List<String> categoriesNames;
   final List<int> categoriesIds;
+  bool isRead;
 
   WPPost({
     required this.id,
@@ -21,22 +22,38 @@ class WPPost {
     required this.featuredImage,
     required this.categoriesNames,
     required this.categoriesIds,
+    this.isRead = false,
   });
 
-  // ---------------------------------------------------------------------------
-  // NEW: Safe factory for WP REST v2 `/wp-json/wp/v2/posts?_embed=1`
-  // ---------------------------------------------------------------------------
   factory WPPost.fromWpV2(Map<String, dynamic> j) {
     String _rendered(Map? o, String k) =>
         (o != null && o[k] is String) ? (o[k] as String) : '';
 
     DateTime _parseDate() {
-      final d = (j['date_gmt'] ?? j['date'])?.toString();
-      try {
-        return DateTime.parse(d!).toUtc();
-      } catch (_) {
-        return DateTime.now().toUtc();
+      final dateGmtStr = j['date_gmt']?.toString();
+      if (dateGmtStr != null && dateGmtStr.isNotEmpty) {
+        try {
+          // CRITICAL FIX: The `date_gmt` string from WordPress is UTC,
+          // but it often lacks the 'Z' suffix. `DateTime.parse` will incorrectly
+          // treat it as a local time without this. Appending 'Z' ensures
+          // it is correctly parsed as UTC.
+          if (dateGmtStr.endsWith('Z')) {
+            return DateTime.parse(dateGmtStr);
+          } else {
+            return DateTime.parse('${dateGmtStr}Z');
+          }
+        } catch (_) {}
       }
+      
+      // Fallback to the local `date` field if `date_gmt` is missing.
+      final dateStr = j['date']?.toString();
+      if (dateStr != null && dateStr.isNotEmpty) {
+        try {
+          return DateTime.parse(dateStr).toUtc();
+        } catch (_) {}
+      }
+      
+      return DateTime.now().toUtc();
     }
 
     String? _featuredFromEmbed() {
@@ -56,23 +73,17 @@ class WPPost {
 
     List<int> _categoryIds() {
       final raw = j['categories'];
-      if (raw is List) {
-        return raw.whereType<int>().toList();
-      }
-      return const <int>[];
+      return (raw is List) ? raw.whereType<int>().toList() : const <int>[];
     }
 
     List<String> _categoryNamesFromEmbed() {
       try {
         final emb = j['_embedded'];
         if (emb is Map && emb['wp:term'] is List) {
-          // wp:term is a list of tax arrays; categories are taxonomy 'category'
           final terms = emb['wp:term'] as List;
           for (final tax in terms) {
             if (tax is List && tax.isNotEmpty) {
-              // find the category array
-              if ((tax.first is Map) &&
-                  ((tax.first as Map)['taxonomy'] == 'category')) {
+              if ((tax.first as Map?)?['taxonomy'] == 'category') {
                 return tax
                     .whereType<Map>()
                     .map((m) => (m['name'] ?? '').toString())
@@ -91,7 +102,7 @@ class WPPost {
       titleRendered: _rendered(j['title'], 'rendered'),
       excerptRendered: _rendered(j['excerpt'], 'rendered'),
       contentRendered: _rendered(j['content'], 'rendered'),
-      dateGmt: _parseDate(),
+      dateGmt: _parseDate(), // <-- USE THE CORRECTED PARSER
       link: (j['link'] ?? '').toString(),
       featuredImage: _featuredFromEmbed(),
       categoriesNames: _categoryNamesFromEmbed(),
@@ -99,11 +110,9 @@ class WPPost {
     );
   }
 
-  /// Convenience to map a list response
   static List<WPPost> listFromWpV2(List<dynamic> arr) =>
       arr.whereType<Map<String, dynamic>>().map(WPPost.fromWpV2).toList();
 
-  // ---- DISPLAY GETTERS (unchanged) ----
   String get title   => _decodeHtml(_stripHtml(titleRendered));
   String get summary => _decodeHtml(_stripHtml(excerptRendered));
   String get body    => _decodeHtml(_stripHtml(contentRendered));
@@ -118,18 +127,20 @@ class WPPost {
   String get videoDuration => '';
 
   String get timeAgo {
-    final diff = DateTime.now().toUtc().difference(dateGmt.toUtc());
-    if (diff.inMinutes < 1) return 'Just now';
+    final diff = DateTime.now().toUtc().difference(dateGmt);
+    
+    if (diff.isNegative) return 'Just now';
+
+    if (diff.inSeconds < 60) return 'Just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
     if (diff.inHours   < 24) return '${diff.inHours} hours ago';
+    
     return DateFormat('d MMM, yyyy • h:mm a').format(dateGmt.toLocal());
   }
 
-  // ---- HELPERS (unchanged) ----
   static String _stripHtml(String html) =>
       html.replaceAll(RegExp(r'<[^>]*>'), '').replaceAll('&nbsp;', ' ').trim();
 
-  /// Decodes common named entities and numeric HTML entities (e.g. &#2325;)
   static String _decodeHtml(String s) {
     var out = s
         .replaceAll('&amp;', '&')
@@ -137,7 +148,6 @@ class WPPost {
         .replaceAll('&apos;', "'")
         .replaceAll('&lt;', '<')
         .replaceAll('&gt;', '>');
-    // numeric: &#NNNN;  or hex: &#xNN;
     out = out.replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
       final code = int.tryParse(m.group(1)!);
       return code == null ? m.group(0)! : String.fromCharCode(code);
@@ -160,6 +170,7 @@ class WPPost {
       featuredImage: json['featuredImage'],
       categoriesNames: (json['categoriesNames'] as List?)?.cast<String>() ?? [],
       categoriesIds: (json['categoriesIds'] as List?)?.cast<int>() ?? [],
+      isRead: json['isRead'] ?? false,
     );
   }
 
@@ -173,6 +184,7 @@ class WPPost {
     'featuredImage': featuredImage,
     'categoriesNames': categoriesNames,
     'categoriesIds': categoriesIds,
+    'isRead': isRead,
   };
 
 }

@@ -7,11 +7,13 @@ import '../features/category_news/wp_article_screen.dart';
 class BreakingNewsSection extends StatelessWidget {
   final int categoryId;   // numeric ID of "Breaking News"
   final int perPage;
+  final void Function(WPPost post)? onPostTap;
 
   const BreakingNewsSection({
     super.key,
     required this.categoryId,
     this.perPage = 5,
+    this.onPostTap,
   });
 
   @override
@@ -34,12 +36,16 @@ class BreakingNewsSection extends StatelessWidget {
         return BreakingNewsCarousel(
           items: items, // WPPost works because it has title/summary/imageUrl
           onTap: (article) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => WpArticleScreen(post: article as WPPost),
-              ),
-            );
+            if (onPostTap != null) {
+              onPostTap!(article as WPPost);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => WpArticleScreen(post: article as WPPost),
+                ),
+              );
+            }
           },
         );
       },

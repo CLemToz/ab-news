@@ -114,7 +114,7 @@ class _LoginCardState extends State<_LoginCard> {
           Expanded(
             child: Text(
               user != null
-                  ? 'Logged in as ${user.displayName}'
+                  ? (user.displayName ?? user.email ?? 'Welcome User')
                   : 'Log in to sync your saved news & preferences across devices.',
               style:
               const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
