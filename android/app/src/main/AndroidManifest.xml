@@ -2,6 +2,9 @@
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+
 
     <!-- Media / storage (safe across API levels) -->
 <!--    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />-->
@@ -43,6 +46,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_push" />
+
     </application>
 
     <!-- Package visibility: used by Flutter text processing plugin -->

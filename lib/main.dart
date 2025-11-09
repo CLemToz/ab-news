@@ -13,8 +13,21 @@ import 'theme/theme_provider.dart';
 // ⬇️ new: global app settings (font size + theme persistence)
 import 'services/app_settings.dart';
 
+// ⬇️ added Firebase core + push service
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/push_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Initialize push notifications
+  await PushService.instance.init();
 
   // keep your provider boot; harmless even if theme comes from AppSettings
   final themeProvider = await ThemeProvider.create();

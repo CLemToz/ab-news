@@ -215,7 +215,7 @@ class WpApi {
     } catch (_) {}
 
     // 5) Date (UTC)
-    final dateStr = (j['date_gmt'] ?? j['date'] ?? '').toString();
+    final dateStr = (j['date'] ?? j['date'] ?? '').toString();
     final dt = DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
 
     // 6) Fallback image

@@ -19,6 +19,7 @@ import '../../services/wp_reels_api.dart';
 import '../../models/wp_reel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../widgets/wp_categories_horizontal.dart';
+import '../notifications/notifications_screen.dart';
 
 
 
@@ -126,7 +127,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       IconButton(
                         icon: const Icon(FontAwesomeIcons.bell),
                         onPressed: () {
-                          // TODO: Add Notification screen navigation
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                          );
                         },
                         color: Brand.red,
                       ),
