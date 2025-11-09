@@ -1,7 +1,10 @@
+import 'package:ab_news/services/notification_service.dart';
 import 'package:ab_news/widgets/login_popup.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
 import 'package:shared_preferences/shared_preferences.dart';
 import 'features/categories/categories_screen.dart';
@@ -17,11 +20,41 @@ import 'theme/theme_provider.dart';
 // ⬇️ new: global app settings (font size + theme persistence)
 import 'services/app_settings.dart';
 
+// Must be a top-level function
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+
+  final notification = message.notification;
+  final android = message.notification?.android;
+  if (notification != null && android != null) {
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+    flutterLocalNotificationsPlugin.show(
+        notification.hashCode,
+        notification.title,
+        notification.body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'new_post_channel',
+            'New Posts',
+            channelDescription: 'Notifications for new posts.',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ));
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Set the background messaging handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  await NotificationService().init();
 
   // keep your provider boot; harmless even if theme comes from AppSettings
   final themeProvider = await ThemeProvider.create();

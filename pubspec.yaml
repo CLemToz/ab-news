@@ -12,6 +12,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_local_notifications: ^17.1.2
+  firebase_messaging: ^14.9.2
 
   # Using modern versions of all packages
   cupertino_icons: ^1.0.8
