@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../theme/brand.dart';
 import '../../models/app_notification.dart';
 import '../../services/notification_store.dart';
+import '../../services/wp_api.dart';
+import '../../models/wp_post.dart';
 import '../category_news/wp_article_screen.dart';
-import '../../models/wp_post.dart'; // for deep-link if you map postId
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -24,6 +27,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final list = await NotificationStore.getAll();
     if (!mounted) return;
     setState(() => _items = list);
+  }
+
+  Future<void> _openArticleFromNotification(AppNotification n) async {
+    if (n.postId == null && (n.link == null || n.link!.isEmpty)) return;
+
+    // show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      WPPost? post;
+
+      if (n.postId != null && n.postId! > 0) {
+        post = await WpApi.fetchPostById(n.postId!);
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // close loader
+
+      if (post != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => WpArticleScreen(post: post!)),
+        );
+      } else if (n.link != null && n.link!.isNotEmpty) {
+        await launchUrl(Uri.parse(n.link!), mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post not available')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this article')),
+      );
+    }
   }
 
   @override
@@ -58,10 +102,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 size: 56, color: cs.onSurfaceVariant),
             const SizedBox(height: 12),
             Center(
-              child: Text('No notifications yet',
-                  style: TextStyle(
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                'No notifications yet',
+                style: TextStyle(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         )
@@ -91,14 +138,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 color: cs.surface,
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
-                  onTap: () {
-                    // Optional deep-link: if you shipped postId+title+link,
-                    // you can open WpArticleScreen by fetching the post.
-                    if (n.link != null && n.link!.isNotEmpty) {
-                      // TODO: open webview or map URL -> WPPost if you have it cached
-                    }
-                  },
                   borderRadius: BorderRadius.circular(12),
+                  onTap: () => _openArticleFromNotification(n),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
@@ -126,11 +167,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(n.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w800)),
+                              Text(
+                                n.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 n.body,

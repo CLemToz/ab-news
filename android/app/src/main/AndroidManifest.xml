@@ -1,15 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.plus.danews">
 
-    <!-- Network -->
+    <!-- Internet & Push Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-
-
-    <!-- Media / storage (safe across API levels) -->
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />-->
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />-->
-    <!-- For older devices pre-T (scoped storage not available) -->
+    <!-- Optional media / storage permissions (for sharing, downloads etc.) -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -32,34 +28,43 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
+            <!-- Needed for proper FCM deep linking -->
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Normal launcher entry -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
-
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
         </activity>
 
-        <!-- Keep for Flutter embedding v2 -->
+        <!-- Required by Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Firebase default notification channel/icon -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_push" />
-
     </application>
 
     <!-- Package visibility: used by Flutter text processing plugin -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
+
 </manifest>

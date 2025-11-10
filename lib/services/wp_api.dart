@@ -19,8 +19,7 @@ class WpApi {
     final qp = <String, String>{
       'per_page': '$perPage',
       'page': '$page',
-      '_embed': '1', // <-- keep this to receive wp:featuredmedia + wp:term
-      // IMPORTANT: do NOT include `_fields` here or you'll lose wp:term
+      '_embed': '1',
     };
     if (categoryId != null && categoryId > 0) {
       qp['categories'] = '$categoryId';
@@ -60,9 +59,6 @@ class WpApi {
   // -------------------------------
   // Category helpers
   // -------------------------------
-
-  /// Returns a category ID for a given slug (e.g. 'breaking-news').
-  /// Used by the slider when you don't want to hardcode the ID.
   static Future<int?> fetchCategoryIdBySlug(String slug) async {
     if (WPConfig.baseUrl.isEmpty) {
       throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
@@ -93,12 +89,9 @@ class WpApi {
     }
   }
 
-  /// Backwards-compatible alias if some files call `getCategoryIdBySlug`.
   static Future<int?> getCategoryIdBySlug(String slug) =>
       fetchCategoryIdBySlug(slug);
 
-  /// Fetch newest posts from the “Breaking” category.
-  /// If you already know the category ID, pass [categoryIdOverride] to skip slug lookup.
   static Future<List<WPPost>> fetchBreaking({
     String slug = 'breaking-news',
     int perPage = 5,
@@ -111,8 +104,8 @@ class WpApi {
   }
 
   // -------------------------------
-// Search posts by text
-// -------------------------------
+  // Search posts
+  // -------------------------------
   static Future<List<WPPost>> searchPosts(
       String query, {
         int perPage = 20,
@@ -127,7 +120,7 @@ class WpApi {
         'search': query,
         'per_page': '$perPage',
         'page': '$page',
-        '_embed': '1', // keep this so we get images + categories
+        '_embed': '1',
       },
     );
 
@@ -140,6 +133,21 @@ class WpApi {
     return data.map<WPPost>((j) => _mapPost(j as Map<String, dynamic>)).toList();
   }
 
+  // -------------------------------
+  // 🔹 Fetch single post by ID (used by Notifications)
+  // -------------------------------
+  static Future<WPPost> fetchPostById(int id) async {
+    if (WPConfig.baseUrl.isEmpty) {
+      throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
+    }
+    final uri = Uri.parse('${WPConfig.baseUrl}/wp-json/wp/v2/posts/$id?_embed=1');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('HTTP ${res.statusCode}: ${res.reasonPhrase}');
+    }
+    final Map<String, dynamic> j = jsonDecode(res.body) as Map<String, dynamic>;
+    return _mapPost(j);
+  }
 
   // -------------------------------
   // Map raw WP JSON → WPPost
@@ -147,7 +155,6 @@ class WpApi {
   static WPPost _mapPost(Map<String, dynamic> j) {
     String? featured;
 
-    // 1) Featured media from _embedded
     try {
       final media = j['_embedded']?['wp:featuredmedia'];
       if (media is List && media.isNotEmpty) {
@@ -169,14 +176,10 @@ class WpApi {
       }
     } catch (_) {}
 
-    // 2) Fallback: first <img> in content HTML
     if (featured == null || featured.isEmpty) {
       try {
         final html = (j['content']?['rendered'] ?? '').toString();
-        final exp = RegExp(
-          "<img[^>]+src=['\"]([^'\"]+)['\"]",
-          caseSensitive: false,
-        );
+        final exp = RegExp("<img[^>]+src=['\"]([^'\"]+)['\"]", caseSensitive: false);
         final match = exp.firstMatch(html);
         if (match != null) {
           featured = match.group(1);
@@ -184,7 +187,6 @@ class WpApi {
       } catch (_) {}
     }
 
-    // 3) Category names from _embedded → wp:term
     final catNames = <String>[];
     try {
       final terms = j['_embedded']?['wp:term'];
@@ -202,7 +204,6 @@ class WpApi {
       }
     } catch (_) {}
 
-    // 4) Category IDs (numeric)
     final catIds = <int>[];
     try {
       final list = j['categories'];
@@ -214,11 +215,9 @@ class WpApi {
       }
     } catch (_) {}
 
-    // 5) Date (UTC)
-    final dateStr = (j['date'] ?? j['date'] ?? '').toString();
+    final dateStr = (j['date'] ?? '').toString();
     final dt = DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
 
-    // 6) Fallback image
     featured ??= 'https://via.placeholder.com/600x400?text=No+Image';
     if (featured.isEmpty) {
       featured = 'https://via.placeholder.com/600x400?text=No+Image';
@@ -235,5 +234,27 @@ class WpApi {
       categoriesNames: catNames,
       categoriesIds: catIds,
     );
+  }
+
+  // Fetch specific posts by their IDs (order not guaranteed by WP)
+  static Future<List<WPPost>> fetchPostsByIds(List<int> ids) async {
+    if (WPConfig.baseUrl.isEmpty) {
+      throw Exception('WPConfig.baseUrl is empty. Set it in lib/config/wp.dart');
+    }
+    if (ids.isEmpty) return <WPPost>[];
+
+    final uri = Uri.parse('${WPConfig.baseUrl}/wp-json/wp/v2/posts').replace(
+      queryParameters: {
+        'include': ids.join(','),
+        'per_page': '${ids.length}',
+        '_embed': '1',
+      },
+    );
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('HTTP ${res.statusCode}: ${res.reasonPhrase}');
+    }
+    final List data = jsonDecode(res.body) as List;
+    return data.map<WPPost>((j) => _mapPost(j as Map<String, dynamic>)).toList();
   }
 }
