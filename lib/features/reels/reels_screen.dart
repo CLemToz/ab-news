@@ -214,30 +214,58 @@ class _ReelsScreenState extends State<ReelsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: PageView.builder(
-          controller: _page,
-          scrollDirection: Axis.vertical,
-          onPageChanged: _onPageChanged,
-          itemCount: _items.length,
-          itemBuilder: (_, i) {
-            final reel = _items[i];
-            final c = _controllers[i];
-            return _ReelPage(
-              reel: reel,
-              controller: c,
-              isCurrent: i == _current,
-              showControls: _showControls,
-              showPauseOverlay: _showPauseOverlay,
-              onTapAnywherePlayPause: _playPauseCurrent, // 👈 tap anywhere toggles play/pause
-              onCenterOverlayTap: _playPauseCurrent,     // 👈 center icon toggles play/pause
-              onToggleMute: _toggleMuteCurrent,
-              onShare: () => Share.share(reel.link ?? reel.videoUrl ?? ''),
-              onLike: () => WpReelsApi.like(reel.id),
-              requestRebuild: () => setState(() {}), // for bottom controls to refresh icons
-            );
-          },
-        ),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _page,
+            scrollDirection: Axis.vertical,
+            onPageChanged: _onPageChanged,
+            itemCount: _items.length,
+            itemBuilder: (_, i) {
+              final reel = _items[i];
+              final c = _controllers[i];
+              return _ReelPage(
+                reel: reel,
+                controller: c,
+                isCurrent: i == _current,
+                showControls: _showControls,
+                showPauseOverlay: _showPauseOverlay,
+                onTapAnywherePlayPause: _playPauseCurrent,
+                onCenterOverlayTap: _playPauseCurrent,
+                onToggleMute: _toggleMuteCurrent,
+                onShare: () => Share.share(reel.link ?? reel.videoUrl ?? ''),
+                onLike: () => WpReelsApi.like(reel.id),
+                requestRebuild: () => setState(() {}),
+              );
+            },
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Text(
+                      "News",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -300,34 +328,6 @@ class _ReelPage extends StatelessWidget {
             ],
           )
               : Container(color: Colors.black),
-        ),
-
-        /// 🔙 Top AppBar with Back Button and "News" (pinned to top)
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Text(
-                    "News",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
 
         /// 📝 Title block

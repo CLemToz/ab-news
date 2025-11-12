@@ -1,8 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../theme/brand.dart';
+
 import '../../services/app_settings.dart';
+import '../../services/auth_service.dart';
+import '../../theme/brand.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -58,18 +62,43 @@ class _SectionTitle extends StatelessWidget {
   );
 }
 
-class _LoginCard extends StatelessWidget {
+class _LoginCard extends StatefulWidget {
   final Color accentRed;
   final Color accentBlue;
+
   const _LoginCard({required this.accentRed, required this.accentBlue});
+
+  @override
+  State<_LoginCard> createState() => _LoginCardState();
+}
+
+class _LoginCardState extends State<_LoginCard> {
+  final AuthService _authService = AuthService.instance;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    return StreamBuilder<User?>(
+      stream: _authService.authStateChanges,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (user != null) {
+          return _buildLoggedInCard(user, cs);
+        } else {
+          return _buildLoggedOutCard(cs);
+        }
+      },
+    );
+  }
+
+  Widget _buildLoggedOutCard(ColorScheme cs) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accentRed.withOpacity(.95), accentBlue.withOpacity(.95)],
+          colors: [
+            widget.accentRed.withOpacity(.95),
+            widget.accentBlue.withOpacity(.95)
+          ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
@@ -88,11 +117,13 @@ class _LoginCard extends StatelessWidget {
                 color: Colors.white, size: 28),
           ),
           const SizedBox(width: 12),
-          Expanded(
+          const Expanded(
             child: Text(
               'Log in to sync your saved news & preferences across devices.',
-              style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -102,16 +133,78 @@ class _LoginCard extends StatelessWidget {
               foregroundColor: cs.primary,
               shape: const StadiumBorder(),
             ),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Login coming soon')),
-            ),
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => const LoginScreen(),
+                fullscreenDialog: true,
+              ));
+            },
             child: const Text('Log in'),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildLoggedInCard(User user, ColorScheme cs) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            widget.accentRed.withOpacity(.95),
+            widget.accentBlue.withOpacity(.95)
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundImage: user.photoURL != null ? NetworkImage(user.photoURL!) : null,
+            child: user.photoURL == null
+                ? const Icon(Icons.person_rounded, color: Colors.white, size: 28)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome, ${user.displayName ?? 'User'}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  user.email ?? '',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () async {
+              await _authService.signOut();
+            },
+            child: const Text('Logout', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 class _InviteTile extends StatelessWidget {
   final Color accent;
@@ -325,10 +418,10 @@ class _ChannelButtons extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        card('assets/brands/airtel_xstream.png', 'Airtel Xstream',
+        card('assets/brands/jiotv.png', 'Airtel Xstream',
             'Open on Airtel Xstream',
             'https://open.airtelxstream.in/o8OEPcoYxXb'),
-        card('assets/brands/jiotv.png', 'JioTV', 'Open on JioTV',
+        card('assets/brands/airtel_xstream.png', 'JioTV', 'Open on JioTV',
             'https://l.tv.jio/fc6dc245'),
       ],
     );

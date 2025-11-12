@@ -110,12 +110,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 40,
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'DA News Plus',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: cs.onSurface,
                         ),
                       ),
                     ],
@@ -399,11 +399,14 @@ class TrendingNewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(14),
+        border: isDarkMode ? Border.all(color: cs.outlineVariant) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
@@ -432,9 +435,9 @@ class TrendingNewsCard extends StatelessWidget {
             fontSize: 16,
           ),
         ),
-        subtitle: const Text(
+        subtitle: Text(
           'Stay updated with top trending stories.',
-          style: TextStyle(fontSize: 13, color: Colors.black54),
+          style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
         ),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(

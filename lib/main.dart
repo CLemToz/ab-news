@@ -1,12 +1,16 @@
+import 'dart:ui';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
 
+import 'features/auth/login_screen.dart';
 import 'features/categories/categories_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/reels/reels_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
-
+import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 
@@ -98,6 +102,29 @@ class _ShellState extends State<Shell> {
     // ⬇️ SettingsScreen no longer needs ThemeProvider
     const SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (FirebaseAuth.instance.currentUser == null) {
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            opaque: false,
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const LoginScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+          ),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
