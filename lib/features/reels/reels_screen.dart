@@ -336,6 +336,9 @@ class _ReelPage extends StatelessWidget {
           right: 88,
           bottom: 20,
           child: SafeArea(
+            top: false,
+            right: false,
+            left: false,
             child: Text(
               reel.titleRendered ?? '',
               maxLines: 2,
@@ -354,63 +357,68 @@ class _ReelPage extends StatelessWidget {
         Positioned(
           right: 14,
           bottom: 90,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Download
-              _ReelActionButton(
-                icon: FontAwesomeIcons.download,
-                label: "डाउनलोड",
-                onTap: () async {
-                  await showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Download'),
-                      content: const Text('Your video will be saved to the gallery.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Saved to gallery')),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
+          child: SafeArea(
+            top: false,
+            right: false,
+            left: false,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Download
+                _ReelActionButton(
+                  icon: FontAwesomeIcons.download,
+                  label: "डाउनलोड",
+                  onTap: () async {
+                    await showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Download'),
+                        content: const Text('Your video will be saved to the gallery.'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Saved to gallery')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
 
-              // WhatsApp share
-              _ReelActionButton(
-                icon: FontAwesomeIcons.whatsapp,
-                label: "व्हाट्सऐप",
-                onTap: () async {
-                  final toShare = (reel.link?.isNotEmpty ?? false)
-                      ? reel.link!
-                      : (reel.videoUrl.isNotEmpty ? reel.videoUrl : reel.hlsUrl);
-                  final encoded = Uri.encodeComponent(toShare);
-                  final uri = Uri.parse('whatsapp://send?text=$encoded');
-                  try {
-                    final ok = await launchUrl(uri);
-                    if (!ok) {
+                // WhatsApp share
+                _ReelActionButton(
+                  icon: FontAwesomeIcons.whatsapp,
+                  label: "व्हाट्सऐप",
+                  onTap: () async {
+                    final toShare = (reel.link?.isNotEmpty ?? false)
+                        ? reel.link!
+                        : (reel.videoUrl.isNotEmpty ? reel.videoUrl : reel.hlsUrl);
+                    final encoded = Uri.encodeComponent(toShare);
+                    final uri = Uri.parse('whatsapp://send?text=$encoded');
+                    try {
+                      final ok = await launchUrl(uri);
+                      if (!ok) {
+                        onShare(); // fallback
+                      }
+                    } catch (_) {
                       onShare(); // fallback
                     }
-                  } catch (_) {
-                    onShare(); // fallback
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
+                  },
+                ),
+                const SizedBox(height: 16),
 
-              // Generic share (system sheet)
-              _ReelActionButton(
-                icon: Icons.share,
-                label: "शेयर",
-                onTap: onShare,
-              ),
-            ],
+                // Generic share (system sheet)
+                _ReelActionButton(
+                  icon: Icons.share,
+                  label: "शेयर",
+                  onTap: onShare,
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -420,11 +428,16 @@ class _ReelPage extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 10,
-            child: _BottomControls(
-              controller: controller!,
-              onPlayPause: onTapAnywherePlayPause,
-              onToggleMute: onToggleMute,
-              requestRebuild: requestRebuild,
+            child: SafeArea(
+              top: false,
+              right: false,
+              left: false,
+              child: _BottomControls(
+                controller: controller!,
+                onPlayPause: onTapAnywherePlayPause,
+                onToggleMute: onToggleMute,
+                requestRebuild: requestRebuild,
+              ),
             ),
           ),
 
