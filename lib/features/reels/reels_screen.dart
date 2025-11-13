@@ -394,18 +394,18 @@ class _ReelPage extends StatelessWidget {
                   icon: FontAwesomeIcons.whatsapp,
                   label: "व्हाट्सऐप",
                   onTap: () async {
-                    final toShare = (reel.link?.isNotEmpty ?? false)
-                        ? reel.link!
-                        : (reel.videoUrl.isNotEmpty ? reel.videoUrl : reel.hlsUrl);
-                    final encoded = Uri.encodeComponent(toShare);
+                    final title = reel.titleRendered ?? '';
+                    final link = reel.link ?? reel.videoUrl ?? '';
+                    final text = '📰 $title\n👉 https://abnews.press/esha-deol-statement/ \n\n📱 Read this on DA News Plus App';
+                    final encoded = Uri.encodeComponent(text);
                     final uri = Uri.parse('whatsapp://send?text=$encoded');
                     try {
                       final ok = await launchUrl(uri);
                       if (!ok) {
-                        onShare(); // fallback
+                        Share.share(text); // fallback
                       }
                     } catch (_) {
-                      onShare(); // fallback
+                      Share.share(text); // fallback
                     }
                   },
                 ),
