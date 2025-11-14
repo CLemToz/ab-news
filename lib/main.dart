@@ -1,7 +1,11 @@
+
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart'; // safe to keep if you use elsewhere
 
 import 'features/auth/login_screen.dart';
@@ -22,24 +26,117 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/push_service.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  // Run the app initialization widget
+  runApp(const AppInitializer());
+}
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+/// This is the new root widget. It handles all async initialization
+/// and shows a loading screen or an error screen.
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({super.key});
 
-  // Initialize push notifications
-  await PushService.instance.init();
+  @override
+  State<AppInitializer> createState() => _AppInitializerState();
+}
 
-  // keep your provider boot; harmless even if theme comes from AppSettings
-  final themeProvider = await ThemeProvider.create();
+class _AppInitializerState extends State<AppInitializer> {
+  // Using a Future to track the initialization state
+  Future<ThemeProvider>? _initializationFuture;
 
-  // load saved font scale + theme mode
-  await AppSettings.I.load();
+  @override
+  void initState() {
+    super.initState();
+    // Start the initialization process
+    _initializationFuture = _initializeApp();
+  }
 
-  runApp(NewsApp(themeProvider: themeProvider));
+  /// All startup logic is now here.
+  Future<ThemeProvider> _initializeApp() async {
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // 1. Check connectivity first.
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult == ConnectivityResult.none) {
+        throw Exception('No Internet Connection');
+      }
+
+      // 2. Initialize Firebase.
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      // 3. Initialize other services.
+      await PushService.instance.init();
+      await AppSettings.I.load();
+
+      // 4. Create the theme provider.
+      final themeProvider = await ThemeProvider.create();
+
+      return themeProvider;
+    } catch (e) {
+      // If any step fails, we re-throw the error to be caught by the FutureBuilder.
+      debugPrint("App initialization failed: $e");
+      rethrow;
+    }
+  }
+
+  /// This function is called when the user presses the 'Retry' button.
+  void _retryInitialization() {
+    setState(() {
+      _initializationFuture = _initializeApp();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ThemeProvider>(
+      future: _initializationFuture,
+      builder: (context, snapshot) {
+        // Case 1: An error occurred during initialization
+        if (snapshot.hasError) {
+          return MaterialApp(
+            home: NoNetworkScreen(onRetry: _retryInitialization),
+            debugShowCheckedModeBanner: false,
+          );
+        }
+
+        // Case 2: Initialization was successful
+        if (snapshot.connectionState == ConnectionState.done) {
+          // Launch the main app
+          return NewsApp(themeProvider: snapshot.data!);
+        }
+
+        // Case 3: Still initializing, show a loading spinner
+        return MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/DA News Plus.jpg',
+                    width: 150,
+                    height: 150,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'DA News Plus',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          debugShowCheckedModeBanner: false,
+        );
+      },
+    );
+  }
 }
 
 class NewsApp extends StatelessWidget {
@@ -56,15 +153,7 @@ class NewsApp extends StatelessWidget {
           title: 'DA News Plus',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-
-          // ⬇️ Use the theme selected in Settings (System/Light/Dark)
-          // If you prefer your ThemeProvider sometimes, you can merge:
-          // themeMode: AppSettings.I.themeMode == ThemeMode.system
-          //     ? themeProvider.value
-          //     : AppSettings.I.themeMode,
           themeMode: AppSettings.I.themeMode,
-
-          // ⬇️ Apply global text scale from Settings (0.85–1.40)
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             return MediaQuery(
@@ -74,7 +163,7 @@ class NewsApp extends StatelessWidget {
               child: child!,
             );
           },
-
+          // The main app shell is now the home
           home: Shell(themeProvider: themeProvider),
           debugShowCheckedModeBanner: false,
         );
@@ -99,7 +188,6 @@ class _ShellState extends State<Shell> {
     const CategoriesScreen(),
     const ReelsScreen(),
     const SearchScreen(),
-    // ⬇️ SettingsScreen no longer needs ThemeProvider
     const SettingsScreen(),
   ];
 
@@ -156,6 +244,46 @@ class _ShellState extends State<Shell> {
             label: 'Settings',
           ),
         ],
+      ),
+    );
+  }
+}
+
+// This screen is now used globally by the AppInitializer
+class NoNetworkScreen extends StatelessWidget {
+  final VoidCallback onRetry;
+  const NoNetworkScreen({super.key, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.signal_wifi_off, size: 100, color: Colors.grey),
+              const SizedBox(height: 20),
+              const Text(
+                'No Internet Connection',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Please check your internet connection and try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: onRetry,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
