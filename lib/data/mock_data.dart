@@ -3,7 +3,7 @@ import '../models/category_item.dart';
 import '../models/reel_item.dart';
 
 const tickerText =
-    'Markets rally on tech earnings • ISRO announces new mission • Govt proposes digital news framework • Sports fever rises across leagues';
+    'Best News App of Chhattisgarh • Breaking News, Local Stories, Live Alerts • News You Can Trust छत्तीसगढ़ का सबसे भरोसेमंद न्यूज़ ऐप • ब्रेकिंग न्यूज़, लोकल कहानियाँ • एक ही जगह, पूरी ख़बर';
 
 const _img = 'https://picsum.photos/seed/';
 
