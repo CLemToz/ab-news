@@ -124,15 +124,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   // ✅ Right side: Notification + Saved icons
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(FontAwesomeIcons.bell),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                          );
-                        },
-                        color: Brand.red,
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(FontAwesomeIcons.bell),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                              );
+                            },
+                            color: Brand.red,
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 8,
+                                minHeight: 8,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       IconButton(
                         icon: const Icon(FontAwesomeIcons.bookmark),

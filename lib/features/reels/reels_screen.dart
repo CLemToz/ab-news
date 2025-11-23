@@ -365,31 +365,6 @@ class _ReelPage extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Download
-                _ReelActionButton(
-                  icon: FontAwesomeIcons.download,
-                  label: "डाउनलोड",
-                  onTap: () async {
-                    await showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Download'),
-                        content: const Text('Your video will be saved to the gallery.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('OK'),
-                          ),
-                        ],
-                      ),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Saved to gallery')),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-
                 // WhatsApp share
                 _ReelActionButton(
                   icon: FontAwesomeIcons.whatsapp,
@@ -399,7 +374,9 @@ class _ReelPage extends StatelessWidget {
                     final link = reel.link ?? reel.videoUrl ?? '';
                     final text = '📰 $title\n👉 https://abnews.press/esha-deol-statement/ \n\n📱 Read this on DA News Plus App';
                     final encoded = Uri.encodeComponent(text);
-                    final uri = Uri.parse('whatsapp://send?text=$encoded');
+                    // final uri = Uri.parse('whatsapp://send?text=$encoded');
+                    final uri = Uri.parse('whatsapp://send?text=📲 Install DA News Plus app to stay updated with local news!');
+
                     try {
                       final ok = await launchUrl(uri);
                       if (!ok) {
@@ -416,7 +393,14 @@ class _ReelPage extends StatelessWidget {
                 _ReelActionButton(
                   icon: Icons.share,
                   label: "शेयर",
-                  onTap: onShare,
+                  onTap: () async {
+                    final title = reel.titleRendered ?? '';
+                    final link = reel.link ?? reel.videoUrl ?? '';
+                    // final shareText = '$title\n\n🎥 Watch here: $link\n\n📲 Install DA News Plus app to stay updated with local news!';
+                    final shareText = '📲 Install DA News Plus app to stay updated with local news!';
+
+                    Share.share(shareText);
+                  },
                 ),
               ],
             ),

@@ -139,27 +139,15 @@ class _WpArticleScreenState extends State<WpArticleScreen> {
                 onPressed: _shareSystem,
                 icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 22),
               ),
-              Builder(builder: (context) {
-                final isDark = Theme.of(context).brightness == Brightness.dark;
-                return Container(
-                  decoration: isDark
-                      ? BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                  )
-                      : null,
-                  padding: const EdgeInsets.all(1),
-                  child: IconButton(
-                    tooltip: 'Share on X',
-                    onPressed: _shareOnX,
-                    icon: FaIcon(
-                      FontAwesomeIcons.squareXTwitter,
-                      color: isDark ? Colors.black : Colors.black87,
-                      size: 20,
-                    ),
-                  ),
-                );
-              }),
+              IconButton(
+                tooltip: 'Share on X',
+                onPressed: _shareOnX,
+                icon: FaIcon(
+                  FontAwesomeIcons.squareXTwitter,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                  size: 20,
+                ),
+              ),
               IconButton(
                 tooltip: 'Share on Facebook',
                 onPressed: _shareOnFacebook,

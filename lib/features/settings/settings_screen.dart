@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../services/app_settings.dart';
 import '../../services/auth_service.dart';
@@ -42,6 +43,21 @@ class SettingsScreen extends StatelessWidget {
           _SectionTitle('Watch our channels'),
           const SizedBox(height: 10),
           const _ChannelButtons(), // new logo cards
+          const SizedBox(height: 20),
+          _SectionTitle('Follow us'),
+          const SizedBox(height: 10),
+          const _SocialMediaLinks(),
+          const SizedBox(height: 30),
+          Center(
+            child: GestureDetector(
+              onTap: () => launchUrl(Uri.parse('https://amigonex.com/'),
+                  mode: LaunchMode.externalApplication),
+              child: const Text(
+                'Developed by AmigoNex',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -418,12 +434,61 @@ class _ChannelButtons extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        card('assets/brands/jiotv.png', 'Airtel Xstream',
-            'Open on Airtel Xstream',
+        card('assets/brands/jiotv.png', 'JioTV',
+            'Open on JioTV',
+            'https://l.tv.jio/48f87208'),
+        card('assets/brands/airtel_xstream.png', 'Airtel Xstream', 'Open on Airtel Xstream',
             'https://open.airtelxstream.in/o8OEPcoYxXb'),
-        card('assets/brands/airtel_xstream.png', 'JioTV', 'Open on JioTV',
-            'https://l.tv.jio/fc6dc245'),
       ],
+    );
+  }
+}
+
+class _SocialMediaLinks extends StatelessWidget {
+  const _SocialMediaLinks();
+
+  Future<void> _launch(String url, BuildContext context) async {
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open link')));
+    }
+  }
+
+  Widget _iconBtn(IconData icon, Color color, String url, BuildContext context) {
+    return IconButton(
+      icon: FaIcon(icon, color: color, size: 28),
+      onPressed: () => _launch(url, context),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _iconBtn(FontAwesomeIcons.instagram, Colors.pink,
+              'https://www.instagram.com/danewsplus_news?igsh=YmR6dXB3NnhsZ3Jp', context),
+          _iconBtn(FontAwesomeIcons.youtube, Colors.red,
+              'https://youtube.com/@danewsplusmpcg?si=HyTaQxXY5qn2BBo7', context),
+          _iconBtn(FontAwesomeIcons.facebook, Colors.blue,
+              'https://www.facebook.com/share/1CwYoLxpgd/', context),
+          _iconBtn(FontAwesomeIcons.squareXTwitter, isDark ? Colors.white : Colors.black,
+              'https://x.com/press98783?t=9vzKk-UgThVxu_1E4Jg-Aw&s=08', context),
+        ],
+      ),
     );
   }
 }
